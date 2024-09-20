@@ -37,12 +37,12 @@ taxons = {
 
     # Animais
     'Canis lupus familiaris': ('Cachorro', 'E'),
-    'Rattus rattus': ('Rato preto', 'E'),
-    'Felis catus': ('Gato', 'E'),
+    # 'Rattus rattus': ('Rato preto', 'E'),
+    # 'Felis catus': ('Gato', 'E'),
 
     # Pássaros
-    'Alcedo atthis': ('King Fisher', 'E'),
-    'Cariamidae': ('Seriema', 'E'),
+    # 'Alcedo atthis': ('King Fisher', 'E'),
+    # 'Cariamidae': ('Seriema', 'E'),
 
     # Fungos
     'Trichoderma': (None, 'E'),

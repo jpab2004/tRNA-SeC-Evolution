@@ -1,8 +1,8 @@
 # Imports
 from collections import defaultdict, deque
 from termcolor import colored
-import re, os, pickle, sys
 from json import dumps
+import os, sys, glob
 
 
 
@@ -22,7 +22,10 @@ pprint = lambda x: print(f'{tabulation}{x}')
 
 ps = lambda x: print(f'{tabulation}{x} | ', end='', flush=True)
 pm = lambda x: print(f'{x} | ', end='', flush=True)
-pe = lambda x: print(f'{x}')
+pe = lambda x: print(x)
+
+psT = lambda x: print(f'{tabulation}{x}: ', end='', flush=True)
+peT = lambda x: print(x)
 
 # Consts
 genomesPath = None
@@ -57,28 +60,6 @@ def sizeOf(num, suffix="B"):
             return [float(f'{num:3.1f}'), f'{unit}{suffix}']
         num /= 1024.0
     return [float(f'{num:3.1f}'), f'Y{suffix}']
-
-def checkSize(species, speciesName, bigfile, fileName='genome', verbose=1):
-    calculated, calculatedUnit = species[speciesName]['filesize-unit']
-    
-    if not bigfile:
-        realText = os.popen(f'du -sh "{fileName}.fasta"').read()
-        try:
-            realMatch = re.search('([0-9]{0,3}[,]{0,1}[0-9]*)([KMGTPEY])', realText)
-            real, realUnit = realMatch.group(1, 2)
-        except:
-            print(tabulation + red('COULD NOT FIND FILE!'))
-            real, realUnit = 0, ''
-    else:
-        print(tabulation + red('Big file detected! Only showing calculated size!'))
-        real, realUnit = 0, ''
-
-    if verbose:
-        print(f'{tabulation}{blue(calculated).replace(".", ","):<17}{magenta(calculatedUnit)} \tCalculated')
-        if not bigfile:
-            print(f'{tabulation}{blue(real):<17}{magenta(realUnit + 'B')} \tReal')
-
-    return real, calculated
 
 def pathCheckCreation(path, returnPath=False):
     if not os.path.isdir(path):
@@ -129,10 +110,11 @@ def addToFetchFile(fetchInfos):
         for name in fetchInfos:
             accession = fetchInfos[name]['accession']
             fetchFolderPath = fetchInfos[name]['fetch-folder'].strip('\n')
+            chromosomesFolderPath = fetchInfos[name]['chromosomes-folder'].strip('\n')
             popularName = fetchInfos[name]['popular-name']
             kingdom = fetchInfos[name]['kingdom']
 
-            fileHandler.write(f'{accession} > {name} > {popularName} > {fetchFolderPath} > {kingdom}\n')
+            fileHandler.write(f'{accession} > {name} > {popularName} > {fetchFolderPath} > {chromosomesFolderPath} > {kingdom}\n')
 
 def addToReadyFile(readyInfos):
     global readyFile
@@ -143,11 +125,11 @@ def addToReadyFile(readyInfos):
     with open(readyFile, 'a') as fileHandler:
         for name in readyInfos:
             accession = readyInfos[name]['accession']
-            readyFolderPath = readyInfos[name]['ready-folder'].strip('\n')
+            chromosomesFolderPath = readyInfos[name]['chromosomes-folder'].strip('\n')
             popularName = readyInfos[name]['popular-name']
             kingdom = readyInfos[name]['kingdom']
 
-            fileHandler.write(f'{accession} > {name} > {popularName} > {readyFolderPath} > {kingdom}\n')
+            fileHandler.write(f'{accession} > {name} > {popularName} > {chromosomesFolderPath} > {kingdom}\n')
 
 
 
@@ -171,7 +153,7 @@ def pretty(value, sort_keys=True, indent=4, colorOrder=[green, blue, red, cyan, 
 
 # Collection of organism data (accession and assembly level)
 def collectInfo(taxons, verbose=1, debug=0):
-    species = defaultdict(lambda: {'accession': None, 'level': None})
+    species = defaultdict(lambda: {'accession': None})
 
     separator()
     print(f'{tabulation}{magenta("DATA COLLECTION COMENCING"):^120}\n')
@@ -199,7 +181,6 @@ def collectInfo(taxons, verbose=1, debug=0):
             for report in summary['reports']:
                 speciesName = report['organism']['organism_name']
                 species[speciesName]['accession'] = report['accession']
-                species[speciesName]['level'] = report['assembly_info']['assembly_level']
                 species[speciesName]['filesize-unit'] = sizeOf(int(report["assembly_stats"]["total_sequence_length"]))
                 species[speciesName]['popular-name'] = popularName
                 species[speciesName]['kingdom'] = kingdom
@@ -221,9 +202,10 @@ def collectInfo(taxons, verbose=1, debug=0):
     return species
 
 # Downloading genomes
-def downloadGenomes(organisms, verbose=1, checkSizes=0, progressbar=0, sizeLimit=15, zipFile='genome', genomeFile='genome', fetchFolder='fetchFolder'):
+def downloadGenomes(organisms, verbose=1, progressbar=0, sizeLimit=15, zipFile='genome', fetchFolder='fetchFolder', chromosomesFolder='chromosomes'):
     global genomesPath, createdGenomesPath, readyFile, createdReadyFile
 
+    lost = 0
     found = 0
     fetchInfos = {}
     readyInfos = {}
@@ -240,36 +222,50 @@ def downloadGenomes(organisms, verbose=1, checkSizes=0, progressbar=0, sizeLimit
         accession = organism['accession']
         size, unit = organism['filesize-unit']
         popularName = organism['popular-name']
+        kingdom = organism['kingdom']
         name = f'{i}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
         arguments = ''
 
-        if (checkSizes or progressbar or verbose):
-            print(f'{tabulation}{yellow(name)}:')
+        shellDownloaded = os.popen(f'if [ -e {genomesPath + "/" + accession}/downloaded.status ]; then echo "1"; else echo "0"; fi;')
+        shellRehydrated = os.popen(f'if [ -e {genomesPath + "/" + accession}/rehydrated.status ]; then echo "1"; else echo "0"; fi;')
+        shellNoChromosome = os.popen(f'if [ -e {genomesPath + "/" + accession}/noChromosome.status ]; then echo "1"; else echo "0"; fi;')
 
         bigfile = (not (unit in ['B', 'KB', 'MB']) or ((size > sizeLimit) and not (unit in ['B', 'KB'])))
-        shellDownloaded = os.popen(f'if [ -e {genomesPath + "/" + accession}/downloaded.status ]; then echo "1"; else echo "0"; fi;')
+
+        if (progressbar or verbose):
+            print(f'{tabulation}{yellow(name)}:')
+
+        if int(shellNoChromosome.read()):
+            if (progressbar or verbose):
+                ps(red('Organism already marked as not having complete chromosomes'))
+                pe(magenta('Skipping organism'))
+                print()
+
+            lost += 1
+            continue
+
         if bigfile:
-            shellFetched = os.popen(f'if [ -e {genomesPath + "/" + accession}/fetched.status ]; then echo "1"; else echo "0"; fi;')
-            if int(shellFetched.read()):
+            if int(shellRehydrated.read()):
                 found += 1
-                if (checkSizes or progressbar or verbose):
-                    ps(green('Already fetched'))
+                if (progressbar or verbose):
+                    ps(green('Already rehydrated'))
                     pe(magenta('Skipping organism'))
                     print()
 
                 readyInfos[organismName] = organisms[organismName]
                 readyInfos[organismName]['popular-name'] = organism['popular-name']
-                readyInfos[organismName]['ready-folder'] = os.popen(f'readlink -f {genomesPath + "/" + accession}').read()
+                readyInfos[organismName]['chromosomes-folder'] = os.popen(f'readlink -f {genomesPath + "/" + accession + "/" + chromosomesFolder}').read()
                 readyInfos[organismName]['kingdom'] = organism['kingdom']
                 continue
             elif int(shellDownloaded.read()):
-                if (checkSizes or progressbar or verbose):
+                if (progressbar or verbose):
                     ps(green('Already downloaded'))
                     pe(magenta('Skipping organism'))
                     print()
 
                 fetchInfos[organismName] = organisms[organismName]
                 fetchInfos[organismName]['fetch-folder'] = os.popen(f'readlink -f {genomesPath + "/" + accession + "/" + fetchFolder}').read()
+                fetchInfos[organismName]['chromosomes-folder'] = os.popen(f'readlink -f {genomesPath + "/" + accession + "/" + chromosomesFolder}').read()
                 fetchInfos[organismName]['popular-name'] = organism['popular-name']
                 continue
 
@@ -278,19 +274,22 @@ def downloadGenomes(organisms, verbose=1, checkSizes=0, progressbar=0, sizeLimit
             arguments += ' --dehydrated'
         elif int(shellDownloaded.read()):
             found += 1
-            if (checkSizes or progressbar or verbose):
+            if (progressbar or verbose):
                 ps(green('Already downloaded'))
                 pe(magenta('Skipping organism'))
                 print()
 
             readyInfos[organismName] = organisms[organismName]
             readyInfos[organismName]['popular-name'] = organism['popular-name']
-            readyInfos[organismName]['ready-folder'] = os.popen(f'readlink -f {genomesPath + "/" + accession}').read()
+            readyInfos[organismName]['chromosomes-folder'] = os.popen(f'readlink -f {genomesPath + "/" + accession + "/" + chromosomesFolder}').read()
             readyInfos[organismName]['kingdom'] = organism['kingdom']
             continue
 
         if not progressbar:
             arguments += ' --no-progressbar'
+
+        if kingdom == 'E':
+            arguments += ' --chromosomes all'
 
         try:
             pathCheckCreation(genomesPath + '/' + accession)
@@ -312,30 +311,34 @@ def downloadGenomes(organisms, verbose=1, checkSizes=0, progressbar=0, sizeLimit
             sys.exit()
         
         if not bigfile:
-            zipShell = os.popen(f'unzip -p "{zipFile}.zip" "ncbi_dataset/data/G*" > "{genomeFile}.fasta"')
+            os.mkdir(genomesPath + '/' + accession + '/' + chromosomesFolder)
+            folder = os.popen(f'readlink -f {genomesPath + "/" + accession + "/" + chromosomesFolder}').read().strip('\n')
+
+            zipShell = os.popen(f'unzip -p "{zipFile}.zip" "ncbi_dataset/data/G*" > "{folder}/chromosome.fna"')
             _ = zipShell.read()
             zipShell.close()
 
             readyInfos[organismName] = organisms[organismName]
             readyInfos[organismName]['popular-name'] = organism['popular-name']
-            readyInfos[organismName]['ready-folder'] = os.popen(f'readlink -f {genomesPath + "/" + accession}').read()
+            readyInfos[organismName]['chromosomes-folder'] = os.popen(f'readlink -f {genomesPath + "/" + accession + "/" + chromosomesFolder}').read()
             readyInfos[organismName]['kingdom'] = organism['kingdom']
         else:
+            os.mkdir(genomesPath + '/' + accession + '/' + chromosomesFolder)
+
             zipShell = os.popen(f'unzip -o "{zipFile}.zip" -d "{fetchFolder}"')
             _ = zipShell.read()
             zipShell.close()
 
             fetchInfos[organismName] = organisms[organismName]
             fetchInfos[organismName]['fetch-folder'] = os.popen(f'readlink -f {genomesPath + "/" + accession + "/" + fetchFolder}').read()
+            fetchInfos[organismName]['chromosomes-folder'] = os.popen(f'readlink -f {genomesPath + "/" + accession + "/" + chromosomesFolder}').read()
             fetchInfos[organismName]['popular-name'] = organism['popular-name']
+            fetchInfos[organismName]['kingdom'] = organism['kingdom']
         
         os.system(f'touch "downloaded.status"')
         
         if verbose:
             pe(green('Downloaded'))
-
-        if checkSizes:
-            sizes = checkSize(organisms, organismName, bigfile, fileName=genomeFile)
 
         if verbose:
             print()
@@ -347,16 +350,16 @@ def downloadGenomes(organisms, verbose=1, checkSizes=0, progressbar=0, sizeLimit
 
     totalTemp = len(list(organisms.keys()))
     fetchTemp = len(list(fetchInfos.keys()))
-    downloadedTemp = totalTemp - fetchTemp - found
+    downloadedTemp = totalTemp - fetchTemp - found - lost
     print(
-        f'{tabulation}{magenta(f"GENOMES DOWNLOAD FINISHED") + " | " + numberP(downloadedTemp) +
-        magenta(f" GENOMES DOWNLOADED, ") + numberP(found) + magenta(" FOUND & ") + numberP(fetchTemp) + magenta(" MORE FOR REHYDRATION"):^175}'
+        f'{tabulation}{numberP(downloadedTemp) + magenta(f" GENOMES DOWNLOADED") + " | " + numberP(found)
+        + magenta(" FOUND, ") + numberP(lost) + magenta(" LOST & ") + numberP(fetchTemp) + magenta(" MORE FOR REHYDRATION"):^195}'
     )
     separator()
 
 
 
-def downloadFetch(file, verbose=1, genomeFile='genome'):
+def downloadFetch(file, verbose=1, progressbar=0):
     with open(genomesPath + '/' + file + '.data', 'r') as fileHandler:
         fetchLines = fileHandler.readlines()
     
@@ -364,23 +367,27 @@ def downloadFetch(file, verbose=1, genomeFile='genome'):
     readyInfos = {}
     for info in fetchLines:
         splitted = info.strip('\n').split(' > ')
-        fetchInfos[splitted[1]] = {'accession': splitted[0], 'popular-name': splitted[2], 'fetch-folder': splitted[3], 'kingdom': splitted[4]}
+        fetchInfos[splitted[1]] = {'accession': splitted[0], 'popular-name': splitted[2], 'fetch-folder': splitted[3], 'chromosomes-folder': splitted[4], 'kingdom': splitted[5]}
 
+    lost = 0
     found = 0
     skipped = 0
     print(f'{tabulation}{magenta(f"GENOMES REHYDRATION COMENCING"):^120}\n')
     for i, organismName in enumerate(fetchInfos, 1):
         fetchFolder = fetchInfos[organismName]['fetch-folder']
+        chromosomesFolder = fetchInfos[organismName]['chromosomes-folder']
         popularName = fetchInfos[organismName]['popular-name']
         accession = fetchInfos[organismName]['accession']
+        kingdom = fetchInfos[organismName]['kingdom']
         name = f'{i}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
+        arguments = ' --directory . --max-workers 30'
 
-        shellFetched = os.popen(f'if [ -e {genomesPath + "/" + accession}/fetched.status ]; then echo "1"; else echo "0"; fi;')
-        if int(shellFetched.read()):
+        shellRehydrated = os.popen(f'if [ -e {genomesPath + "/" + accession}/rehydrated.status ]; then echo "1"; else echo "0"; fi;')
+        if int(shellRehydrated.read()):
             found += 1
             if verbose:
                 print(f'{tabulation}{yellow(name)}:')
-                ps(green('Already fetched'))
+                ps(green('Already rehydrated'))
                 pe(magenta('Skipping organism'))
                 print()
             continue
@@ -396,22 +403,45 @@ def downloadFetch(file, verbose=1, genomeFile='genome'):
         except:
             if verbose:
                 ps(red('Could not find fetch folder!'))
-                pe(cyan('Skiping organism'))
+                pe(cyan('Skipping organism'))
                 print()
 
             skipped += 1
             continue
 
+        if kingdom == 'E':
+            arguments += ' --match chr'
+        if not progressbar:
+            arguments += ' --no-progressbar'
+
         try:
-            rehydrationShell = os.popen(f'datasets rehydrate --directory . --max-workers 30 --no-progressbar')
-            _ = rehydrationShell.read()
+            rehydrationShell = os.popen(f'datasets rehydrate --directory .{arguments}')
+            rehydrationRead = rehydrationShell.read()
             rehydrationShell.close()
 
-            mvFile = fetchFolder + '/ncbi_dataset/' + os.popen(f'datasets rehydrate --directory . --max-workers 30 --no-progressbar --list').read().strip('\n')
-            command = f'mv "{mvFile}" "{fetchFolder}/../{genomeFile}.fasta" -v'
-            moveShell = os.popen(command)
-            _ = moveShell.read()
-            moveShell.close()
+            if 'Found no files for rehydration' in rehydrationRead:
+                pm(red('No Complete chromosome found'))
+                pe(magenta('Skipping organism'))
+                print()
+                
+                shellTouch = os.popen('> "../noChromosome.status"')
+                _ = shellTouch.read()
+                shellTouch.close()
+
+                lost += 1
+
+                continue
+
+            mvFilesTemp1 = fetchFolder + '/ncbi_dataset/' + os.popen(f'datasets rehydrate{arguments} --list').read().strip('\n')
+            mvFilesTemp2 = mvFilesTemp1.split('\n')
+            mvFiles = [mvFilesTemp2[0]] + [fetchFolder + '/ncbi_dataset/' + tmp for tmp in mvFilesTemp2[1:]]
+
+            for mvFile in mvFiles:
+                command = f'mv "{mvFile}" "{chromosomesFolder}" -v'
+
+                moveShell = os.popen(command)
+                _ = moveShell.read()
+                moveShell.close()
         except KeyboardInterrupt:
             sys.exit()
         except Exception as e:
@@ -419,11 +449,11 @@ def downloadFetch(file, verbose=1, genomeFile='genome'):
             sys.exit()
 
         readyInfos[organismName] = fetchInfos[organismName]
+        readyInfos[organismName]['chromosomes-folder'] = os.popen(f'readlink -f {chromosomesFolder}').read()
         readyInfos[organismName]['popular-name'] = fetchInfos[organismName]['popular-name']
-        readyInfos[organismName]['ready-folder'] = os.popen(f'readlink -f {genomesPath + "/" + accession}').read()
         readyInfos[organismName]['kingdom'] = fetchInfos[organismName]['kingdom']
 
-        shellTouch = os.popen('> "../fetched.status"')
+        shellTouch = os.popen('> "../rehydrated.status"')
         _ = shellTouch.read()
         shellTouch.close()
 
@@ -436,24 +466,29 @@ def downloadFetch(file, verbose=1, genomeFile='genome'):
     addToReadyFile(readyInfos)
 
     totalTemp = len(list(fetchInfos.keys()))
-    rehydTemp = totalTemp - skipped - found
-    print(f'{tabulation}{numberP(rehydTemp) + magenta(f" GENOMES REHYDRATED | ") + numberP(found) + magenta(" FOUND ") + numberP(skipped) + magenta(" SKIPPED"):^165}')
+    rehydTemp = totalTemp - skipped - found - lost
+    print(
+        f'{tabulation}{numberP(rehydTemp) + magenta(f" GENOMES REHYDRATED") + " | " + numberP(found) + magenta(" FOUND, ") + numberP(lost) +
+        magenta(" LOST & ") + numberP(skipped) + magenta(" SKIPPED"):^185}'
+    )
     separator()
 
-def trnaScanSE(file, verbose=1, genomeFile='genome', hitsFile='hits'):
+def trnaScanSE(file, verbose=1):
     with open(genomesPath + '/' + file + '.data', 'r') as fileHandler:
         readyLines = fileHandler.readlines()
     
     readyInfos = {}
     for info in readyLines:
         splitted = info.strip('\n').split(' > ')
-        readyInfos[splitted[1]] = {'accession': splitted[0], 'popular-name': splitted[2], 'ready-folder': splitted[3], 'kingdom': splitted[4]}
+        popularName = splitted[2] if splitted[2] != 'None' else None
+
+        readyInfos[splitted[1]] = {'accession': splitted[0], 'popular-name': popularName, 'chromosomes-folder': splitted[3], 'kingdom': splitted[4]}
 
     found = 0
     skipped = 0
-    print(f'{tabulation}{magenta(f"tRNAscan-SE ANALYSIS COMENCING"):^120}\n')
+    print(f'{tabulation}{magenta(f"tRNAscan-SE ANALYSIS COMENCING" + " | " + numberP(len(readyLines)) + magenta("GENOMES")):^140}\n')
     for i, organismName in enumerate(readyInfos, 1):
-        readyFolder = readyInfos[organismName]['ready-folder']
+        chromosomesFolder = readyInfos[organismName]['chromosomes-folder']
         popularName = readyInfos[organismName]['popular-name']
         accession = readyInfos[organismName]['accession']
         kingdom = readyInfos[organismName]['kingdom']
@@ -464,7 +499,8 @@ def trnaScanSE(file, verbose=1, genomeFile='genome', hitsFile='hits'):
             found += 1
             if verbose:
                 print(f'{tabulation}{yellow(name)}:')
-                print(f'{tabulation}{green("Already analysed")} | {magenta("Skipping organism")}')
+                ps(green('Already analysed'))
+                pe(magenta('Skipping organism'))
                 print()
             continue
 
@@ -472,26 +508,35 @@ def trnaScanSE(file, verbose=1, genomeFile='genome', hitsFile='hits'):
             print(f'{tabulation}{yellow(name)}:')
         
         try:
-            os.chdir(readyFolder)
+            os.chdir(chromosomesFolder)
             if verbose:
-                ps(green("Ready folder found"))
-                pm(cyan("Attempting analysis"))
+                ps(green('Chromosomes folder found'))
+                pe(cyan('Attempting analysis'))
         except:
             if verbose:
-                ps(red("Could not find ready folder!"))
-                pe(cyan("Skiping organism"))
+                ps(red('Could not find chromosomes folder!'))
+                pe(cyan('Skipping organism'))
                 print()
 
             skipped += 1
             continue
 
         try:
-            shellTRNA = os.popen(f'tRNAscan-SE -{kingdom} {genomeFile}.fasta -q --detail -Q -a {hitsFile}.fasta')
-            _ = shellTRNA.read()
-            shellTRNA.close()
+            filesToAnalyse = list(glob.glob('*.fna'))
+
+            for fileToAnalyse in filesToAnalyse:
+                psT(cyan(fileToAnalyse))
+
+                shellTRNA = os.popen(f'tRNAscan-SE -{kingdom} {fileToAnalyse} -q --detail -Q -a {fileToAnalyse[:-4]}.hits')
+                _ = shellTRNA.read()
+                shellTRNA.close()
+
+                peT(green('Finished'))
         except KeyboardInterrupt:
+            shellTRNA.close()
             sys.exit()
         except Exception as e:
+            shellTRNA.close()
             print(tabulation + red('ERROR:') + e)
             sys.exit()
 
@@ -500,12 +545,12 @@ def trnaScanSE(file, verbose=1, genomeFile='genome', hitsFile='hits'):
         shellTouch.close()
 
         if verbose:
-            pe(green("Analysed"))
+            print(f'{tabulation}{green("Analysed")}')
             print()
 
         os.chdir(genomesPath)
 
-    shellGrepNumber = os.popen(f'cat GCF_*/{hitsFile}.fasta | grep "SeC" -c')
+    shellGrepNumber = os.popen(f'cat GCF_*/chromosomes/*.hits | grep "SeC" -c')
     totalHits = int(shellGrepNumber.read())
     shellGrepNumber.close()
 
