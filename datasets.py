@@ -37,6 +37,12 @@ createdFetchFile = False
 readyFile = None
 createdReadyFile = False
 
+detectedFile = None
+createdDetectedFile = False
+
+processedFile = None
+createdProcessedFile = False
+
 
 
 def printCollection(taxon, numberOfOrganisms, status, popularName=None, summaryRead=None):
@@ -49,6 +55,8 @@ def printCollection(taxon, numberOfOrganisms, status, popularName=None, summaryR
     elif status == 2:
         print(f'{tabulation}{yellow(taxon):<40} {cyan(pop):<30} {magenta("No sequenced genome data"):>40} |')
     elif status == 3:
+        print(f'{tabulation}{red("NEW DATASETS CLIENT VERSION!!!"):^120}')
+    elif status == 4:
         print(f'{tabulation}{yellow(taxon):<40} {cyan(pop):<30} {red("Collection error"):>40} | {red(summaryRead.replace("\n", " "))}')
     else:
         print(f'{tabulation}{red("ERROR! INVALID COLLECTION STATUS!")}')
@@ -60,6 +68,13 @@ def sizeOf(num, suffix="B"):
             return [float(f'{num:3.1f}'), f'{unit}{suffix}']
         num /= 1024.0
     return [float(f'{num:3.1f}'), f'Y{suffix}']
+
+def checkPath(path, returnPath=False):
+    if not os.path.isdir(path):
+        os.mkdir(path)
+
+    if returnPath:
+        return path
 
 def pathCheckCreation(path, returnPath=False):
     if not os.path.isdir(path):
@@ -98,6 +113,22 @@ def createReadyFile(__readyFile='ready'):
 
     readyFile = os.popen(f'readlink -f {__readyFile}.data').read()[:-1]
 
+def createDetectedFile(__detectedFile='detected'):
+    global detectedFile, createdDetectedFile
+    
+    os.system(f'> {__detectedFile}.data')
+    createdDetectedFile = True
+
+    detectedFile = os.popen(f'readlink -f {__detectedFile}.data').read()[:-1]
+
+def createProcessedFile(__processedFile='processed'):
+    global processedFile, createdProcessedFile
+    
+    os.system(f'> {__processedFile}.data')
+    createdProcessedFile = True
+
+    processedFile = os.popen(f'readlink -f {__processedFile}.data').read()[:-1]
+
 
 
 def addToFetchFile(fetchInfos):
@@ -128,6 +159,21 @@ def addToReadyFile(readyInfos):
             chromosomesFolderPath = readyInfos[name]['chromosomes-folder'].strip('\n')
             popularName = readyInfos[name]['popular-name']
             kingdom = readyInfos[name]['kingdom']
+
+            fileHandler.write(f'{accession} > {name} > {popularName} > {chromosomesFolderPath} > {kingdom}\n')
+
+def addToDetectedFile(detectedInfos):
+    global detectedFile
+
+    if not createdDetectedFile:
+        createDetectedFile()
+
+    with open(detectedFile, 'a') as fileHandler:
+        for name in detectedInfos:
+            accession = detectedInfos[name]['accession']
+            chromosomesFolderPath = detectedInfos[name]['chromosomes-folder'].strip('\n')
+            popularName = detectedInfos[name]['popular-name']
+            kingdom = detectedInfos[name]['kingdom']
 
             fileHandler.write(f'{accession} > {name} > {popularName} > {chromosomesFolderPath} > {kingdom}\n')
 
@@ -171,8 +217,11 @@ def collectInfo(taxons, verbose=1, debug=0):
             if 'but no genome data is currently available for this taxon' in summaryRead:
                 printCollection(name, 0, 2, popularName=popularName)
                 continue
+            elif 'New version of client' in summaryRead:
+                printCollection('', 0, 3)
+                continue
             else:
-                printCollection(name, 0, 3, popularName=popularName, summaryRead=summaryRead)
+                printCollection(name, 0, 4, popularName=popularName, summaryRead=summaryRead[:300])
                 continue
         
         shell.close()
@@ -207,6 +256,7 @@ def downloadGenomes(organisms, verbose=1, progressbar=0, sizeLimit=15, zipFile='
 
     lost = 0
     found = 0
+    skipped = 0
     fetchInfos = {}
     readyInfos = {}
 
@@ -297,13 +347,27 @@ def downloadGenomes(organisms, verbose=1, progressbar=0, sizeLimit=15, zipFile='
             ps(green('Download folder found'))
             pm(cyan('Attempting download'))
 
-            shellTouch = os.popen(f'touch "{organismName}.name"')
+            shellTouch = os.popen(f'touch "{organismName.replace("/", "_")}.name"')
             _ = shellTouch.read()
             shellTouch.close()
 
             shellDownload = os.popen(f'datasets download genome accession {accession} --filename "{zipFile}.zip"{arguments}')
-            _ = shellDownload.read()
+            result = shellDownload.read()
             shellDownload.close()
+
+            if 'connection reset by peer' in result:
+                pm(red('Connection reseted'))
+                pe(magenta('Skipping organism'))
+                skipped += 1
+
+                continue
+
+            if 'timeout' in result:
+                pm(red('Connection timeout'))
+                pe(magenta('Skipping organism'))
+                skipped += 1
+
+                continue
         except KeyboardInterrupt:
             sys.exit()
         except Exception as e:
@@ -311,7 +375,7 @@ def downloadGenomes(organisms, verbose=1, progressbar=0, sizeLimit=15, zipFile='
             sys.exit()
         
         if not bigfile:
-            os.mkdir(genomesPath + '/' + accession + '/' + chromosomesFolder)
+            checkPath(genomesPath + '/' + accession + '/' + chromosomesFolder)
             folder = os.popen(f'readlink -f {genomesPath + "/" + accession + "/" + chromosomesFolder}').read().strip('\n')
 
             zipShell = os.popen(f'unzip -p "{zipFile}.zip" "ncbi_dataset/data/G*" > "{folder}/chromosome.fna"')
@@ -323,7 +387,7 @@ def downloadGenomes(organisms, verbose=1, progressbar=0, sizeLimit=15, zipFile='
             readyInfos[organismName]['chromosomes-folder'] = os.popen(f'readlink -f {genomesPath + "/" + accession + "/" + chromosomesFolder}').read()
             readyInfos[organismName]['kingdom'] = organism['kingdom']
         else:
-            os.mkdir(genomesPath + '/' + accession + '/' + chromosomesFolder)
+            checkPath(genomesPath + '/' + accession + '/' + chromosomesFolder)
 
             zipShell = os.popen(f'unzip -o "{zipFile}.zip" -d "{fetchFolder}"')
             _ = zipShell.read()
@@ -352,15 +416,15 @@ def downloadGenomes(organisms, verbose=1, progressbar=0, sizeLimit=15, zipFile='
     fetchTemp = len(list(fetchInfos.keys()))
     downloadedTemp = totalTemp - fetchTemp - found - lost
     print(
-        f'{tabulation}{numberP(downloadedTemp) + magenta(f" GENOMES DOWNLOADED") + " | " + numberP(found)
-        + magenta(" FOUND, ") + numberP(lost) + magenta(" LOST & ") + numberP(fetchTemp) + magenta(" MORE FOR REHYDRATION"):^195}'
+        f'{tabulation}{numberP(downloadedTemp) + magenta(f" GENOMES DOWNLOADED") + " | " + numberP(found) + magenta(" FOUND, ")
+        + numberP(skipped) + magenta(" SKIPPED & ") + numberP(lost) + magenta(" LOST & ") + numberP(fetchTemp) + magenta(" MORE FOR REHYDRATION"):^205}'
     )
     separator()
 
 
 
-def downloadFetch(file, verbose=1, progressbar=0):
-    with open(genomesPath + '/' + file + '.data', 'r') as fileHandler:
+def downloadFetch(readyFile, verbose=1, progressbar=0):
+    with open(genomesPath + '/' + readyFile + '.data', 'r') as fileHandler:
         fetchLines = fileHandler.readlines()
     
     fetchInfos = {}
@@ -546,7 +610,7 @@ def trnaScanSE(file, verbose=1):
             print(tabulation + red('ERROR:') + e)
             sys.exit()
 
-        shellTouch = os.popen('> "analysed.status"')
+        shellTouch = os.popen('> "../analysed.status"')
         _ = shellTouch.read()
         shellTouch.close()
 
@@ -563,5 +627,111 @@ def trnaScanSE(file, verbose=1):
     print(
         f'{tabulation}{numberP(len(list(readyInfos.keys()))) + magenta(" GENOMES ANALYSED AND ") + numberP(totalHits) + magenta(" tRNA-SeCs FOUND | ") +
         numberP(found) + magenta(" ALREADY ANALYSED & ") + numberP(skipped) + magenta(" SKIPPED"):^180}'
+    )
+    separator()
+
+def findDetectedSeC(readyFile, verbose=1):
+    with open(genomesPath + '/' + readyFile + '.data', 'r') as fileHandler:
+        readyLines = fileHandler.readlines()
+    
+    readyInfos = {}
+    for info in readyLines:
+        splitted = info.strip('\n').split(' > ')
+        popularName = splitted[2] if splitted[2] != 'None' else None
+
+        readyInfos[splitted[1]] = {'accession': splitted[0], 'popular-name': popularName, 'chromosomes-folder': splitted[3], 'kingdom': splitted[4]}
+
+    skipped = 0
+    foundPlus = 0
+    foundMinus = 0
+    detectedInfos = {}
+
+    print(f'{tabulation}{magenta(f"DETECTED SeC ANALYSIS COMENCING" + " | " + numberP(len(readyLines)) + magenta(" GENOMES")):^140}\n')
+    for i, organismName in enumerate(readyInfos, 1):
+        chromosomesFolder = readyInfos[organismName]['chromosomes-folder']
+        popularName = readyInfos[organismName]['popular-name']
+        accession = readyInfos[organismName]['accession']
+        kingdom = readyInfos[organismName]['kingdom']
+        name = f'{i}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
+
+        shellAlreadyDetectedPlus = os.popen(f'if [ -e {genomesPath + "/" + accession}/detected+.status ]; then echo "1"; else echo "0"; fi;')
+        shellAlreadyDetectedMinus = os.popen(f'if [ -e {genomesPath + "/" + accession}/detected-.status ]; then echo "1"; else echo "0"; fi;')
+        if int(shellAlreadyDetectedPlus.read()):
+            foundPlus += 1
+            detectedInfos[organismName] = readyInfos[organismName]
+
+            if verbose:
+                print(f'{tabulation}{yellow(name)}:')
+                ps(green('Already passed detection'))
+                pe(magenta('Skipping organism'))
+                print()
+
+            continue
+        elif int(shellAlreadyDetectedMinus.read()):
+            foundMinus += 1
+
+            if verbose:
+                print(f'{tabulation}{yellow(name)}:')
+                ps(green('Already detected'))
+                pe(magenta('Skipping organism'))
+                print()
+
+            continue
+
+        if (verbose):            
+            print(f'{tabulation}{yellow(name)}:')
+        
+        try:
+            os.chdir(chromosomesFolder)
+            if verbose:
+                ps(green('Chromosomes folder found'))
+                pe(cyan('Attempting count'))
+        except:
+            if verbose:
+                ps(red('Could not find chromosomes folder!'))
+                pe(cyan('Skipping organism'))
+                print()
+
+            skipped += 1
+            continue
+
+        try:
+            shellDetected = os.popen(f'cat *.hits | grep "SeC" -c')
+            numberDetected = int(shellDetected.read())
+            shellDetected.close()
+        except KeyboardInterrupt:
+            shellDetected.close()
+            sys.exit()
+        except Exception as e:
+            shellDetected.close()
+            print(tabulation + red('ERROR:') + e)
+            sys.exit()
+
+
+        if numberDetected > 0:
+            detectedInfos[organismName] = readyInfos[organismName]
+
+            shellTouch = os.popen('> "../detected+.status"')
+            _ = shellTouch.read()
+            shellTouch.close()
+        else:
+            shellTouch = os.popen('> "../detected-.status"')
+            _ = shellTouch.read()
+            shellTouch.close()
+
+        if verbose:
+            ps(green('Detection finished'))
+            pe(numberP(numberDetected) + magenta(' tRNAs-SeC detected'))
+            print()
+
+        os.chdir(genomesPath)
+
+    addToDetectedFile(detectedInfos)
+
+    totalHits = len(list(detectedInfos.keys())) - foundPlus
+    print(
+        f'{tabulation}{numberP(len(list(readyInfos.keys()))) + magenta(" GENOMES PASSED DETECTION AND ") + numberP(totalHits) + magenta(" tRNA-SeCs WERE FOUND | ")
+        + numberP(foundPlus + foundMinus) + magenta(" ALREADY PASSED (") + numberP(foundPlus) + magenta("+ ") + numberP(foundMinus) + magenta("-) & ")
+        + numberP(skipped) + magenta(" SKIPPED"):^220}'
     )
     separator()
