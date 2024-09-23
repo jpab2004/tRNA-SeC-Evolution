@@ -486,7 +486,7 @@ def trnaScanSE(file, verbose=1):
 
     found = 0
     skipped = 0
-    print(f'{tabulation}{magenta(f"tRNAscan-SE ANALYSIS COMENCING" + " | " + numberP(len(readyLines)) + magenta("GENOMES")):^140}\n')
+    print(f'{tabulation}{magenta(f"tRNAscan-SE ANALYSIS COMENCING" + " | " + numberP(len(readyLines)) + magenta(" GENOMES")):^140}\n')
     for i, organismName in enumerate(readyInfos, 1):
         chromosomesFolder = readyInfos[organismName]['chromosomes-folder']
         popularName = readyInfos[organismName]['popular-name']
@@ -523,11 +523,17 @@ def trnaScanSE(file, verbose=1):
 
         try:
             filesToAnalyse = list(glob.glob('*.fna'))
+            filesToAnalyse.sort()
 
             for fileToAnalyse in filesToAnalyse:
                 psT(cyan(fileToAnalyse))
 
-                shellTRNA = os.popen(f'tRNAscan-SE -{kingdom} {fileToAnalyse} -q --detail -Q -a {fileToAnalyse[:-4]}.hits')
+                shellChromosomeAnalysed = os.popen(f'if [ -e {chromosomesFolder}/{fileToAnalyse[:-4]}.hits ]; then echo "1"; else echo "0"; fi;')
+                if int(shellChromosomeAnalysed.read()):
+                    peT(green('Already analysed') + ' | ' + magenta('Skipping chromosome'))
+                    continue
+
+                shellTRNA = os.popen(f'tRNAscan-SE -{kingdom} {fileToAnalyse} -q --detail -D -Q -a {fileToAnalyse[:-4]}.hits')
                 _ = shellTRNA.read()
                 shellTRNA.close()
 
