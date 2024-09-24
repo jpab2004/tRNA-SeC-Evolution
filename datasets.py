@@ -1,8 +1,8 @@
 # Imports
 from collections import defaultdict, deque
 from termcolor import colored
+import os, sys, glob, ast
 from json import dumps
-import os, sys, glob
 
 
 
@@ -59,6 +59,7 @@ def printCollection(taxon, numberOfOrganisms, status, popularName=None, summaryR
         print(f'{tabulation}{yellow(taxon):<40} {cyan(pop):<30} {magenta("No sequenced genome data"):>40} |')
     elif status == 3:
         print(f'{tabulation}{red("NEW DATASETS CLIENT VERSION!!!"):^120}')
+        sys.exit()
     elif status == 4:
         print(f'{tabulation}{yellow(taxon):<40} {cyan(pop):<30} {red("Collection error"):>40} | {red(summaryRead.replace("\n", " "))}')
     else:
@@ -260,10 +261,10 @@ def collectInfo(taxons, verbose=1, debug=0):
         name = f'{i}. {taxon}'
 
         try:
-            summary = eval(summaryRead.replace('true', '"true"'))
+            summary = ast.literal_eval(summaryRead.replace('true', '"true"'))
             if debug:
                 pretty(summary)
-        except:
+        except Exception as e:
             if 'but no genome data is currently available for this taxon' in summaryRead:
                 printCollection(name, 0, 2, popularName=popularName)
                 continue
@@ -272,6 +273,7 @@ def collectInfo(taxons, verbose=1, debug=0):
                 continue
             else:
                 printCollection(name, 0, 4, popularName=popularName, summaryRead=summaryRead[:300])
+                print(e, len(summaryRead))
                 continue
         
         shell.close()
