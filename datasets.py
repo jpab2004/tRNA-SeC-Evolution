@@ -28,22 +28,22 @@ psT = lambda x: print(f'{tabulation}{x}: ', end='', flush=True)
 peT = lambda x: print(x)
 
 # Consts
-genomesPath = None
+globalGenomesPath = None
 createdGenomesPath = False
 
-fetchFile = None
+globalFetchFile = None
 createdFetchFile = False
 
-readyFile = None
+globalReadyFile = None
 createdReadyFile = False
 
-detectedFile = None
+globalDetectedFile = None
 createdDetectedFile = False
 
-processedFile = None
+globalProcessedFile = None
 createdProcessedFile = False
 
-alignFile = None
+globalAlignFile = None
 createdAlignFile = False
 
 
@@ -92,53 +92,53 @@ def pathCheckCreation(path, returnPath=False):
 
 # Creation of the Genomes path
 def createGenomesPath(__genomesPath='Genomes/'):
-    global genomesPath, createdGenomesPath
+    global globalGenomesPath, createdGenomesPath
 
     __path = os.getcwd()
     __path = pathCheckCreation(__path + '/' + __genomesPath, returnPath=True)
     createdGenomesPath = True
 
-    genomesPath = __path
+    globalGenomesPath = __path
 
 def createFetchFile(__fetchFile='fetch'):
-    global fetchFile, createdFetchFile
+    global globalFetchFile, createdFetchFile
     
     os.system(f'> {__fetchFile}.data')
     createdFetchFile = True
 
-    fetchFile = os.popen(f'readlink -f {__fetchFile}.data').read()[:-1]
+    globalFetchFile = os.popen(f'readlink -f {__fetchFile}.data').read()[:-1]
 
 def createReadyFile(__readyFile='ready'):
-    global readyFile, createdReadyFile
+    global globalReadyFile, createdReadyFile
     
     os.system(f'> {__readyFile}.data')
     createdReadyFile = True
 
-    readyFile = os.popen(f'readlink -f {__readyFile}.data').read()[:-1]
+    globalReadyFile = os.popen(f'readlink -f {__readyFile}.data').read()[:-1]
 
 def createDetectedFile(__detectedFile='detected'):
-    global detectedFile, createdDetectedFile
+    global globalDetectedFile, createdDetectedFile
     
     os.system(f'> {__detectedFile}.data')
     createdDetectedFile = True
 
-    detectedFile = os.popen(f'readlink -f {__detectedFile}.data').read()[:-1]
+    globalDetectedFile = os.popen(f'readlink -f {__detectedFile}.data').read()[:-1]
 
 def createProcessedFile(__processedFile='processed'):
-    global processedFile, createdProcessedFile
+    global globalProcessedFile, createdProcessedFile
     
     os.system(f'> {__processedFile}.fna')
     createdProcessedFile = True
 
-    processedFile = os.popen(f'readlink -f {__processedFile}.fna').read()[:-1]
+    globalProcessedFile = os.popen(f'readlink -f {__processedFile}.fna').read()[:-1]
 
 def createAlignFile(__alignFile='align'):
-    global alignFile, createdAlignFile
+    global globalAlignFile, createdAlignFile
     
     os.system(f'> {__alignFile}.fasta')
     createdAlignFile = True
 
-    alignFile = os.popen(f'readlink -f {__alignFile}.fasta').read()[:-1]
+    globalAlignFile = os.popen(f'readlink -f {__alignFile}.fasta').read()[:-1]
 
 def initiate(__genomesPath='Genomes/', __fetchFile='fetch', __readyFile='ready', __detectedFile='detected', __processedFile='processed', __alignFile='align'):
     createGenomesPath(__genomesPath)
@@ -152,8 +152,12 @@ def initiate(__genomesPath='Genomes/', __fetchFile='fetch', __readyFile='ready',
 
 
 
-def addToFetchFile(fetchInfos):
-    global fetchFile
+def addToFetchFile(fetchInfos, __fetchFile=None):
+    if __fetchFile == None:
+        global globalFetchFile
+        fetchFile = globalFetchFile
+    else:
+        fetchFile = __fetchFile
 
     if not createdFetchFile:
         createFetchFile()
@@ -168,8 +172,12 @@ def addToFetchFile(fetchInfos):
 
             fileHandler.write(f'{accession} > {name} > {popularName} > {fetchFolderPath} > {chromosomesFolderPath} > {kingdom}\n')
 
-def addToReadyFile(readyInfos):
-    global readyFile
+def addToReadyFile(readyInfos, __readyFile=None):
+    if __readyFile == None:
+        global globalReadyFile
+        readyFile = globalReadyFile
+    else:
+        readyFile = __readyFile
 
     if not createdReadyFile:
         createReadyFile()
@@ -183,8 +191,12 @@ def addToReadyFile(readyInfos):
 
             fileHandler.write(f'{accession} > {name} > {popularName} > {chromosomesFolderPath} > {kingdom}\n')
 
-def addToDetectedFile(detectedInfos):
-    global detectedFile
+def addToDetectedFile(detectedInfos, __detectedFile=None):
+    if __detectedFile == None:
+        global globalDetectedFile
+        detectedFile = globalDetectedFile
+    else:
+        detectedFile = __detectedFile
 
     if not createdDetectedFile:
         createDetectedFile()
@@ -198,8 +210,12 @@ def addToDetectedFile(detectedInfos):
 
             fileHandler.write(f'{accession} > {name} > {popularName} > {chromosomesFolderPath} > {kingdom}\n')
 
-def addToProcessedFile(processedInfos):
-    global processedFile
+def addToProcessedFile(processedInfos, __processedFile=None):
+    if __processedFile == None:
+        global globalProcessedFile
+        processedFile = globalProcessedFile
+    else:
+        processedFile = __processedFile
 
     if not createdProcessedFile:
         createProcessedFile()
@@ -285,8 +301,24 @@ def collectInfo(taxons, verbose=1, debug=0):
     return species
 
 # Downloading genomes
-def downloadGenomes(organisms, verbose=1, progressbar=0, sizeLimit=15, zipFile='genome', fetchFolder='fetchFolder', chromosomesFolder='chromosomes'):
-    global genomesPath, createdGenomesPath, readyFile, createdReadyFile
+def downloadGenomes(
+        organisms,
+        __genomesPath=None,
+        __readyFile=None,
+        __fetchFile=None,
+        verbose=1,
+        progressbar=0,
+        sizeLimit=15,
+        zipFile='genome',
+        fetchFolder='fetchFolder',
+        chromosomesFolder='chromosomes'
+    ):
+
+    if __genomesPath == None:
+        global globalGenomesPath, createdGenomesPath
+        genomesPath = globalGenomesPath
+    else:
+        genomesPath = __genomesPath
 
     lost = 0
     found = 0
@@ -443,8 +475,8 @@ def downloadGenomes(organisms, verbose=1, progressbar=0, sizeLimit=15, zipFile='
 
         os.chdir(genomesPath)
         
-    addToReadyFile(readyInfos)
-    addToFetchFile(fetchInfos)
+    addToReadyFile(readyInfos, __readyFile)
+    addToFetchFile(fetchInfos, __fetchFile)
 
     totalTemp = len(list(organisms.keys()))
     fetchTemp = len(list(fetchInfos.keys()))
@@ -457,8 +489,12 @@ def downloadGenomes(organisms, verbose=1, progressbar=0, sizeLimit=15, zipFile='
 
 
 
-def downloadFetch(verbose=1, progressbar=0):
-    global fetchFile
+def downloadFetch(__fetchFile=None, __readyFile=None, verbose=1, progressbar=0):
+    if __fetchFile == None:
+        global globalFetchFile
+        fetchFile = globalFetchFile
+    else:
+        fetchFile = __fetchFile
 
     with open(fetchFile, 'r') as fileHandler:
         fetchLines = fileHandler.readlines()
@@ -482,7 +518,7 @@ def downloadFetch(verbose=1, progressbar=0):
         name = f'{i}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
         arguments = ' --directory . --max-workers 30'
 
-        shellRehydrated = os.popen(f'if [ -e {genomesPath + "/" + accession}/rehydrated.status ]; then echo "1"; else echo "0"; fi;')
+        shellRehydrated = os.popen(f'if [ -e {globalGenomesPath + "/" + accession}/rehydrated.status ]; then echo "1"; else echo "0"; fi;')
         if int(shellRehydrated.read()):
             found += 1
             if verbose:
@@ -561,9 +597,9 @@ def downloadFetch(verbose=1, progressbar=0):
             pe(green('Rehydrated'))
             print()
 
-        os.chdir(genomesPath)
+        os.chdir(globalGenomesPath)
     
-    addToReadyFile(readyInfos)
+    addToReadyFile(readyInfos, __readyFile)
 
     totalTemp = len(list(fetchInfos.keys()))
     rehydTemp = totalTemp - skipped - found - lost
@@ -573,8 +609,12 @@ def downloadFetch(verbose=1, progressbar=0):
     )
     separator()
 
-def trnaScanSE(verbose=1):
-    global readyFile
+def trnaScanSE(__readyFile=None, verbose=1):
+    if __readyFile == None:
+        global globalReadyFile
+        readyFile = globalReadyFile
+    else:
+        readyFile = __readyFile
 
     with open(readyFile, 'r') as fileHandler:
         readyLines = fileHandler.readlines()
@@ -596,7 +636,7 @@ def trnaScanSE(verbose=1):
         kingdom = readyInfos[organismName]['kingdom']
         name = f'{i}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
 
-        shellAnalysed = os.popen(f'if [ -e {genomesPath + "/" + accession}/analysed.status ]; then echo "1"; else echo "0"; fi;')
+        shellAnalysed = os.popen(f'if [ -e {globalGenomesPath + "/" + accession}/analysed.status ]; then echo "1"; else echo "0"; fi;')
         if int(shellAnalysed.read()):
             found += 1
             if verbose:
@@ -656,7 +696,7 @@ def trnaScanSE(verbose=1):
             print(f'{tabulation}{green("Analysed")}')
             print()
 
-        os.chdir(genomesPath)
+        os.chdir(globalGenomesPath)
 
     shellGrepNumber = os.popen(f'cat GCF_*/chromosomes/*.hits | grep "SeC" -c')
     totalHits = int(shellGrepNumber.read())
@@ -668,8 +708,12 @@ def trnaScanSE(verbose=1):
     )
     separator()
 
-def findDetectedSeC(verbose=1):
-    global readyFile
+def findDetectedSeC(__readyFile=None, __detectedFile=None, verbose=1):
+    if __readyFile == None:
+        global globalReadyFile
+        readyFile = globalReadyFile
+    else:
+        readyFile = __readyFile
 
     with open(readyFile, 'r') as fileHandler:
         readyLines = fileHandler.readlines()
@@ -694,8 +738,8 @@ def findDetectedSeC(verbose=1):
         kingdom = readyInfos[organismName]['kingdom']
         name = f'{i}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
 
-        shellAlreadyDetectedPlus = os.popen(f'if [ -e {genomesPath + "/" + accession}/detected+.status ]; then echo "1"; else echo "0"; fi;')
-        shellAlreadyDetectedMinus = os.popen(f'if [ -e {genomesPath + "/" + accession}/detected-.status ]; then echo "1"; else echo "0"; fi;')
+        shellAlreadyDetectedPlus = os.popen(f'if [ -e {globalGenomesPath + "/" + accession}/detected+.status ]; then echo "1"; else echo "0"; fi;')
+        shellAlreadyDetectedMinus = os.popen(f'if [ -e {globalGenomesPath + "/" + accession}/detected-.status ]; then echo "1"; else echo "0"; fi;')
         if int(shellAlreadyDetectedPlus.read()):
             foundPlus += 1
             detectedInfos[organismName] = readyInfos[organismName]
@@ -764,9 +808,9 @@ def findDetectedSeC(verbose=1):
             pe(numberP(numberDetected) + magenta(' tRNAs-SeC detected'))
             print()
 
-        os.chdir(genomesPath)
+        os.chdir(globalGenomesPath)
 
-    addToDetectedFile(detectedInfos)
+    addToDetectedFile(detectedInfos, __detectedFile)
 
     totalHits = len(list(detectedInfos.keys())) - foundPlus
     print(
@@ -776,8 +820,12 @@ def findDetectedSeC(verbose=1):
     )
     separator()
 
-def preprocessSeC(verbose=1):
-    global detectedFile
+def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
+    if __detectedFile == None:
+        global globalDetectedFile
+        detectedFile = globalDetectedFile
+    else:
+        detectedFile = __detectedFile
 
     with open(detectedFile, 'r') as fileHandler:
         detectedLines = fileHandler.readlines()
@@ -845,7 +893,7 @@ def preprocessSeC(verbose=1):
             print(f'{tabulation}{green("Processing finished")}')
             print()
 
-    addToProcessedFile(processedInfos)
+    addToProcessedFile(processedInfos, __processedFile)
 
     count = len(list(processedInfos.keys()))
     print(
@@ -853,10 +901,10 @@ def preprocessSeC(verbose=1):
     )
     separator()
 
-def alignMAFFT(progress=0):
-    global processedFile, alignFile
+def alignMAFFT(__processedFile=None, __alignFile=None, progress=0):
+    global globalProcessedFile, globalAlignFile
     
-    with open(detectedFile, 'r') as fileHandler:
+    with open(globalDetectedFile, 'r') as fileHandler:
         numberGenomes = len(fileHandler.readlines())
 
     print(f'{tabulation}{magenta(f"MAFFT alignment starting" + " | " + numberP(numberGenomes) + magenta(" genomes")):^140}\n')
@@ -865,7 +913,7 @@ def alignMAFFT(progress=0):
         if not progress:
             args += ' --quiet'
 
-        shellMAFFT = os.popen(f'mafft {args} "{processedFile}" > "{alignFile}"')
+        shellMAFFT = os.popen(f'mafft {args} "{globalProcessedFile}" > "{globalAlignFile}"')
         _ = shellMAFFT.read()
         shellMAFFT.close()
     except KeyboardInterrupt:
