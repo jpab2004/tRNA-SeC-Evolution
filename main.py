@@ -1,4 +1,4 @@
-from datasets import collectInfo, downloadGenomes, downloadFetch, trnaScanSE, findDetectedSeC, preprocessSeC
+from datasets import collectInfo, downloadGenomes, downloadFetch, trnaScanSE, findDetectedSeC, preprocessSeC, alignMAFFT
 from datasets import initiate, pretty
 import os, argparse
 
@@ -14,6 +14,7 @@ parser.add_argument("--fetch-file", help="The name for the default fetch file in
 parser.add_argument("--ready-file", help="The name for the default ready file information.")
 parser.add_argument("--detected-file", help="The name for the default detected file information.")
 parser.add_argument("--processed-file", help="The name for the default processed file information.")
+parser.add_argument("--align-file", help="The name for the default alignment file.")
 args=parser.parse_args()
 
 
@@ -23,6 +24,7 @@ fetchFile = args.fetch_file if args.fetch_file != None else 'fetch'
 readyFile = args.ready_file if args.ready_file != None else 'ready'
 detectedFile = args.detected_file if args.detected_file != None else 'detected'
 processedFile = args.processed_file if args.processed_file != None else 'processed'
+alignFile = args.align_file if args.align_file != None else 'align'
 
 
 
@@ -57,7 +59,15 @@ taxons = {
     'Archaea': ['Arqueias', 'A']
 }
 
-initiate(__genomesPath=genomesPath, __fetchFile=fetchFile, __readyFile=readyFile, __detectedFile=detectedFile, __processedFile=processedFile)
+args = {
+    '__genomesPath': genomesPath,
+    '__fetchFile': fetchFile,
+    '__readyFile': readyFile,
+    '__detectedFile': detectedFile,
+    '__processedFile': processedFile,
+    '__alignFile': alignFile
+}
+initiate(**args)
 
 species = collectInfo(taxons)
 downloadGenomes(species, sizeLimit=20)
@@ -65,3 +75,4 @@ downloadFetch()
 trnaScanSE()
 findDetectedSeC()
 preprocessSeC()
+alignMAFFT()

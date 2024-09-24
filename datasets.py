@@ -43,6 +43,9 @@ createdDetectedFile = False
 processedFile = None
 createdProcessedFile = False
 
+alignFile = None
+createdAlignFile = False
+
 
 
 def printCollection(taxon, numberOfOrganisms, status, popularName=None, summaryRead=None):
@@ -129,12 +132,21 @@ def createProcessedFile(__processedFile='processed'):
 
     processedFile = os.popen(f'readlink -f {__processedFile}.fna').read()[:-1]
 
-def initiate(__genomesPath='Genomes/', __fetchFile='fetch', __readyFile='ready', __detectedFile='detected', __processedFile='processed'):
+def createAlignFile(__alignFile='align'):
+    global alignFile, createdAlignFile
+    
+    os.system(f'> {__alignFile}.fasta')
+    createdAlignFile = True
+
+    alignFile = os.popen(f'readlink -f {__alignFile}.fasta').read()[:-1]
+
+def initiate(__genomesPath='Genomes/', __fetchFile='fetch', __readyFile='ready', __detectedFile='detected', __processedFile='processed', __alignFile='align'):
     createGenomesPath(__genomesPath)
     createFetchFile(__fetchFile)
     createReadyFile(__readyFile)
     createDetectedFile(__detectedFile)
     createProcessedFile(__processedFile)
+    createAlignFile(__alignFile)
 
     return
 
@@ -837,6 +849,30 @@ def preprocessSeC(verbose=1):
 
     count = len(list(processedInfos.keys()))
     print(
-        f'{tabulation}{magenta("tRNAs-SeC preprocessing ended | ") + numberP(count) + magenta(" genomes processed & ") + numberP(skipped) + magenta(" skipped"):^145}'
+        f'{tabulation}{magenta("tRNAs-SeC preprocessing ended | ") + numberP(count) + magenta(" genomes processed & ") + numberP(skipped) + magenta(" skipped"):^155}'
     )
+    separator()
+
+def alignMAFFT(progress=0):
+    global processedFile, alignFile
+    
+    with open(detectedFile, 'r') as fileHandler:
+        numberGenomes = len(fileHandler.readlines())
+
+    print(f'{tabulation}{magenta(f"MAFFT alignment starting" + " | " + numberP(numberGenomes) + magenta(" genomes")):^140}\n')
+    try:
+        args = '--auto --reorder'
+        if not progress:
+            args += ' --quiet'
+
+        shellMAFFT = os.popen(f'mafft {args} "{processedFile}" > "{alignFile}"')
+        _ = shellMAFFT.read()
+        shellMAFFT.close()
+    except KeyboardInterrupt:
+        sys.exit()
+    except Exception as e:
+        print(tabulation + red('ERROR:') + e)
+        sys.exit()
+    
+    print(f'{tabulation}{magenta(f"MAFFT alignment ended"):^120}')
     separator()
