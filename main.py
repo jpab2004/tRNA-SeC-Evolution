@@ -8,27 +8,7 @@ os.system('clear')
 
 
 
-parser=argparse.ArgumentParser()
-parser.add_argument("--genomes-path", help="Path for the genomes to be stored.")
-parser.add_argument("--fetch-file", help="The name for the default fetch file information.")
-parser.add_argument("--ready-file", help="The name for the default ready file information.")
-parser.add_argument("--detected-file", help="The name for the default detected file information.")
-parser.add_argument("--processed-file", help="The name for the default processed file information.")
-parser.add_argument("--align-file", help="The name for the default alignment file.")
-args=parser.parse_args()
-
-
-
-genomesPath = args.genomes_path if args.genomes_path != None else 'Genomes/'
-fetchFile = args.fetch_file if args.fetch_file != None else 'fetch'
-readyFile = args.ready_file if args.ready_file != None else 'ready'
-detectedFile = args.detected_file if args.detected_file != None else 'detected'
-processedFile = args.processed_file if args.processed_file != None else 'processed'
-alignFile = args.align_file if args.align_file != None else 'align'
-
-
-
-taxons = {
+__taxons = {
     # # Bacteria
     # 'Pseudomonas fluorescens': (None, 'B'),
     # 'Mycoplasmoides pneumoniae': ('Pneumonia', 'B'),
@@ -59,7 +39,29 @@ taxons = {
     'Archaea': ['Arqueias', 'A']
 }
 
-args = {
+
+
+parser=argparse.ArgumentParser()
+parser.add_argument("--genomes-path", help="Path for the genomes to be stored.")
+parser.add_argument("--fetch-file", help="The name for the default fetch file information.")
+parser.add_argument("--ready-file", help="The name for the default ready file information.")
+parser.add_argument("--detected-file", help="The name for the default detected file information.")
+parser.add_argument("--processed-file", help="The name for the default processed file information.")
+parser.add_argument("--align-file", help="The name for the default alignment file.")
+parser.add_argument("--taxon", help="The name for the taxon to be analysed.")
+args=parser.parse_args()
+
+genomesPath = args.genomes_path if args.genomes_path != None else 'Genomes/'
+fetchFile = args.fetch_file if args.fetch_file != None else 'fetch'
+readyFile = args.ready_file if args.ready_file != None else 'ready'
+detectedFile = args.detected_file if args.detected_file != None else 'detected'
+processedFile = args.processed_file if args.processed_file != None else 'processed'
+alignFile = args.align_file if args.align_file != None else 'align'
+taxons = eval(args.taxon) if args.taxon != None else __taxons
+
+
+
+files = {
     '__genomesPath': genomesPath,
     '__fetchFile': fetchFile,
     '__readyFile': readyFile,
@@ -67,7 +69,7 @@ args = {
     '__processedFile': processedFile,
     '__alignFile': alignFile
 }
-initiate(**args)
+initiate(**files)
 
 species = collectInfo(taxons)
 downloadGenomes(species, sizeLimit=20)
