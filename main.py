@@ -49,6 +49,7 @@ parser.add_argument("--detected-file", help="The name for the default detected f
 parser.add_argument("--processed-file", help="The name for the default processed file information.")
 parser.add_argument("--align-file", help="The name for the default alignment file.")
 parser.add_argument("--taxon", help="The name for the taxon to be analysed.")
+parser.add_argument("--reference-range", help="Range of organisms in the taxon to be analysed.")
 args=parser.parse_args()
 
 genomesPath = args.genomes_path if args.genomes_path != None else 'Genomes/'
@@ -58,6 +59,7 @@ detectedFile = args.detected_file if args.detected_file != None else 'detected'
 processedFile = args.processed_file if args.processed_file != None else 'processed'
 alignFile = args.align_file if args.align_file != None else 'align'
 taxons = eval(args.taxon) if args.taxon != None else __taxons
+referenceRange = eval(args.reference_range)
 
 
 
@@ -72,7 +74,7 @@ files = {
 initiate(**files)
 
 species = collectInfo(taxons)
-downloadGenomes(species, sizeLimit=20)
+downloadGenomes(species, sizeLimit=20, referenceRange=referenceRange)
 downloadFetch()
 trnaScanSE()
 findDetectedSeC()
