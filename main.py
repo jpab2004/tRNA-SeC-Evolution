@@ -1,6 +1,5 @@
-from datasets import createGenomesPath, createFetchFile, createReadyFile, createDetectedFile, createProcessedFile
-from datasets import collectInfo, downloadGenomes, downloadFetch, trnaScanSE, findDetectedSeC
-from datasets import pretty
+from datasets import collectInfo, downloadGenomes, downloadFetch, trnaScanSE, findDetectedSeC, preprocessSeC
+from datasets import initiate, pretty
 import os, argparse
 
 
@@ -58,14 +57,11 @@ taxons = {
     'Archaea': ['Arqueias', 'A']
 }
 
-createGenomesPath(genomesPath)
-createFetchFile(fetchFile)
-createReadyFile(readyFile)
-createDetectedFile(detectedFile)
-createProcessedFile(processedFile)
+initiate(__genomesPath=genomesPath, __fetchFile=fetchFile, __readyFile=readyFile, __detectedFile=detectedFile, __processedFile=processedFile)
 
 species = collectInfo(taxons)
 downloadGenomes(species, sizeLimit=20)
-downloadFetch(fetchFile)
-trnaScanSE(readyFile)
-findDetectedSeC(readyFile)
+downloadFetch()
+trnaScanSE()
+findDetectedSeC()
+preprocessSeC()

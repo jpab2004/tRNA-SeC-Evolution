@@ -124,10 +124,19 @@ def createDetectedFile(__detectedFile='detected'):
 def createProcessedFile(__processedFile='processed'):
     global processedFile, createdProcessedFile
     
-    os.system(f'> {__processedFile}.data')
+    os.system(f'> {__processedFile}.fna')
     createdProcessedFile = True
 
-    processedFile = os.popen(f'readlink -f {__processedFile}.data').read()[:-1]
+    processedFile = os.popen(f'readlink -f {__processedFile}.fna').read()[:-1]
+
+def initiate(__genomesPath='Genomes/', __fetchFile='fetch', __readyFile='ready', __detectedFile='detected', __processedFile='processed'):
+    createGenomesPath(__genomesPath)
+    createFetchFile(__fetchFile)
+    createReadyFile(__readyFile)
+    createDetectedFile(__detectedFile)
+    createProcessedFile(__processedFile)
+
+    return
 
 
 
@@ -177,6 +186,19 @@ def addToDetectedFile(detectedInfos):
 
             fileHandler.write(f'{accession} > {name} > {popularName} > {chromosomesFolderPath} > {kingdom}\n')
 
+def addToProcessedFile(processedInfos):
+    global processedFile
+
+    if not createdProcessedFile:
+        createProcessedFile()
+
+    with open(processedFile, 'a') as fileHandler:
+        for name in processedInfos:
+            header = processedInfos[name]['header']
+            sequence = processedInfos[name]['sequence']
+
+            fileHandler.write(f'{header}\n{sequence}\n\n')
+
 
 
 # Printing dictionaries
@@ -202,7 +224,7 @@ def collectInfo(taxons, verbose=1, debug=0):
     species = defaultdict(lambda: {'accession': None})
 
     separator()
-    print(f'{tabulation}{magenta("DATA COLLECTION COMENCING"):^120}\n')
+    print(f'{tabulation}{magenta("Data collection starting"):^120}\n')
     for i, (taxon, (popularName, kingdom)) in enumerate(sorted(taxons.items()), 1):
         command = f'datasets summary genome taxon "{taxon}" --reference --assembly-source RefSeq 2>&1'
         shell = os.popen(command)
@@ -240,7 +262,7 @@ def collectInfo(taxons, verbose=1, debug=0):
         except:
             printCollection(name, 0, 0, popularName=popularName)
 
-    print(f'\n{tabulation}{magenta(f"DATA COLLECTION ENDED") + " | " + numberP(len(list(species.keys()))) + magenta(" TOTAL ORGANISM COLLECTED"):^140}')
+    print(f'\n{tabulation}{magenta(f"Data collection ended") + " | " + numberP(len(list(species.keys()))) + magenta(" total organisms collected"):^140}')
     separator()
 
     if debug:
@@ -266,7 +288,7 @@ def downloadGenomes(organisms, verbose=1, progressbar=0, sizeLimit=15, zipFile='
     if not createdReadyFile:
         createReadyFile()
 
-    print(f'{tabulation}{magenta("GENOMES DOWNLOAD COMENCING"):^120}\n')
+    print(f'{tabulation}{magenta("Genomes download starting"):^120}\n')
     for i, organismName in enumerate(organisms, 1):
         organism = organisms[organismName]
         accession = organism['accession']
@@ -416,15 +438,17 @@ def downloadGenomes(organisms, verbose=1, progressbar=0, sizeLimit=15, zipFile='
     fetchTemp = len(list(fetchInfos.keys()))
     downloadedTemp = totalTemp - fetchTemp - found - lost
     print(
-        f'{tabulation}{numberP(downloadedTemp) + magenta(f" GENOMES DOWNLOADED") + " | " + numberP(found) + magenta(" FOUND, ")
-        + numberP(skipped) + magenta(" SKIPPED & ") + numberP(lost) + magenta(" LOST & ") + numberP(fetchTemp) + magenta(" MORE FOR REHYDRATION"):^205}'
+        f'{tabulation}{numberP(downloadedTemp) + magenta(f" genomes downloaded") + " | " + numberP(found) + magenta(" found, ")
+        + numberP(skipped) + magenta(" skipped & ") + numberP(lost) + magenta(" lost & ") + numberP(fetchTemp) + magenta(" more for rehydration"):^205}'
     )
     separator()
 
 
 
-def downloadFetch(readyFile, verbose=1, progressbar=0):
-    with open(genomesPath + '/' + readyFile + '.data', 'r') as fileHandler:
+def downloadFetch(verbose=1, progressbar=0):
+    global fetchFile
+
+    with open(fetchFile, 'r') as fileHandler:
         fetchLines = fileHandler.readlines()
     
     fetchInfos = {}
@@ -436,7 +460,7 @@ def downloadFetch(readyFile, verbose=1, progressbar=0):
     lost = 0
     found = 0
     skipped = 0
-    print(f'{tabulation}{magenta(f"GENOMES REHYDRATION COMENCING"):^120}\n')
+    print(f'{tabulation}{magenta(f"Genomes rehydration starting"):^120}\n')
     for i, organismName in enumerate(fetchInfos, 1):
         fetchFolder = fetchInfos[organismName]['fetch-folder']
         chromosomesFolder = fetchInfos[organismName]['chromosomes-folder']
@@ -532,13 +556,15 @@ def downloadFetch(readyFile, verbose=1, progressbar=0):
     totalTemp = len(list(fetchInfos.keys()))
     rehydTemp = totalTemp - skipped - found - lost
     print(
-        f'{tabulation}{numberP(rehydTemp) + magenta(f" GENOMES REHYDRATED") + " | " + numberP(found) + magenta(" FOUND, ") + numberP(lost) +
-        magenta(" LOST & ") + numberP(skipped) + magenta(" SKIPPED"):^185}'
+        f'{tabulation}{numberP(rehydTemp) + magenta(f" genomes rehydrated") + " | " + numberP(found) + magenta(" found, ") + numberP(lost) +
+        magenta(" lost & ") + numberP(skipped) + magenta(" skipped"):^185}'
     )
     separator()
 
-def trnaScanSE(file, verbose=1):
-    with open(genomesPath + '/' + file + '.data', 'r') as fileHandler:
+def trnaScanSE(verbose=1):
+    global readyFile
+
+    with open(readyFile, 'r') as fileHandler:
         readyLines = fileHandler.readlines()
     
     readyInfos = {}
@@ -550,7 +576,7 @@ def trnaScanSE(file, verbose=1):
 
     found = 0
     skipped = 0
-    print(f'{tabulation}{magenta(f"tRNAscan-SE ANALYSIS COMENCING" + " | " + numberP(len(readyLines)) + magenta(" GENOMES")):^140}\n')
+    print(f'{tabulation}{magenta(f"tRNAscan-SE analysis starting" + " | " + numberP(len(readyLines)) + magenta(" genomes")):^140}\n')
     for i, organismName in enumerate(readyInfos, 1):
         chromosomesFolder = readyInfos[organismName]['chromosomes-folder']
         popularName = readyInfos[organismName]['popular-name']
@@ -625,13 +651,15 @@ def trnaScanSE(file, verbose=1):
     shellGrepNumber.close()
 
     print(
-        f'{tabulation}{numberP(len(list(readyInfos.keys()))) + magenta(" GENOMES ANALYSED AND ") + numberP(totalHits) + magenta(" tRNA-SeCs FOUND | ") +
-        numberP(found) + magenta(" ALREADY ANALYSED & ") + numberP(skipped) + magenta(" SKIPPED"):^180}'
+        f'{tabulation}{numberP(len(list(readyInfos.keys()))) + magenta(" genomes analysed and ") + numberP(totalHits) + magenta(" tRNA-SeCs found | ") +
+        numberP(found) + magenta(" already analysed & ") + numberP(skipped) + magenta(" skipped"):^180}'
     )
     separator()
 
-def findDetectedSeC(readyFile, verbose=1):
-    with open(genomesPath + '/' + readyFile + '.data', 'r') as fileHandler:
+def findDetectedSeC(verbose=1):
+    global readyFile
+
+    with open(readyFile, 'r') as fileHandler:
         readyLines = fileHandler.readlines()
     
     readyInfos = {}
@@ -646,7 +674,7 @@ def findDetectedSeC(readyFile, verbose=1):
     foundMinus = 0
     detectedInfos = {}
 
-    print(f'{tabulation}{magenta(f"DETECTED SeC ANALYSIS COMENCING" + " | " + numberP(len(readyLines)) + magenta(" GENOMES")):^140}\n')
+    print(f'{tabulation}{magenta(f"Detected tRNAs-SeC analysis starting" + " | " + numberP(len(readyLines)) + magenta(" genomes")):^140}\n')
     for i, organismName in enumerate(readyInfos, 1):
         chromosomesFolder = readyInfos[organismName]['chromosomes-folder']
         popularName = readyInfos[organismName]['popular-name']
@@ -730,8 +758,85 @@ def findDetectedSeC(readyFile, verbose=1):
 
     totalHits = len(list(detectedInfos.keys())) - foundPlus
     print(
-        f'{tabulation}{numberP(len(list(readyInfos.keys()))) + magenta(" GENOMES PASSED DETECTION AND ") + numberP(totalHits) + magenta(" tRNA-SeCs WERE FOUND | ")
-        + numberP(foundPlus + foundMinus) + magenta(" ALREADY PASSED (") + numberP(foundPlus) + magenta("+ ") + numberP(foundMinus) + magenta("-) & ")
-        + numberP(skipped) + magenta(" SKIPPED"):^220}'
+        f'{tabulation}{numberP(len(list(readyInfos.keys()))) + magenta(" genomes passed detection and ") + numberP(totalHits) + magenta(" tRNAs-SeC were found | ")
+        + numberP(foundPlus + foundMinus) + magenta(" already passed (") + numberP(foundPlus) + magenta("+ ") + numberP(foundMinus) + magenta("-) & ")
+        + numberP(skipped) + magenta(" skipped"):^220}'
+    )
+    separator()
+
+def preprocessSeC(verbose=1):
+    global detectedFile
+
+    with open(detectedFile, 'r') as fileHandler:
+        detectedLines = fileHandler.readlines()
+    
+    detectedInfos = {}
+    for info in detectedLines:
+        splitted = info.strip('\n').split(' > ')
+        popularName = splitted[2] if splitted[2] != 'None' else None
+
+        detectedInfos[splitted[1]] = {'accession': splitted[0], 'popular-name': popularName, 'chromosomes-folder': splitted[3], 'kingdom': splitted[4]}
+
+    skipped = 0
+    processedInfos = {}
+
+    print(f'{tabulation}{magenta(f"Preprocessing tRNAs-SeC starting" + " | " + numberP(len(detectedLines)) + magenta(" genomes")):^140}\n')
+    for i, organismName in enumerate(detectedInfos, 1):
+        chromosomesFolder = detectedInfos[organismName]['chromosomes-folder']
+        popularName = detectedInfos[organismName]['popular-name']
+        accession = detectedInfos[organismName]['accession']
+        kingdom = detectedInfos[organismName]['kingdom']
+        name = f'{i}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
+
+        if (verbose):            
+            print(f'{tabulation}{yellow(name)}:')
+        
+        try:
+            os.chdir(chromosomesFolder)
+            if verbose:
+                ps(green('Chromosomes folder found'))
+                pe(cyan('Attempting extraction'))
+        except:
+            if verbose:
+                ps(red('Could not find chromosomes folder!'))
+                pe(cyan('Skipping organism'))
+                print()
+
+            skipped += 1
+            continue
+
+        try:
+            shellDetected = os.popen(f'cat *.hits | grep "SeC" -A 2')
+            detectedTRNA = shellDetected.read()[:-1]
+            shellDetected.close()
+
+            parts = detectedTRNA.split('\n')
+            headerInfos = parts[0].split(' ')
+            tRNASequence = parts[1] + parts[2]
+
+            chromosomeState, chromosomeNumber, tRNANumber = headerInfos[0][1:].split('.')
+            chromosomePosition = headerInfos[1].split(':')[1]
+            strand, size, score = headerInfos[2], headerInfos[5], headerInfos[8]
+
+            headerFinal = f'>{organismName.replace(" ", "_")} | {kingdom}_{chromosomeState}.{chromosomeNumber}:{chromosomePosition} | {strand}_{size}_{score}'
+
+            processedInfos[organismName] = {'info': detectedInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
+        except KeyboardInterrupt:
+            shellDetected.close()
+            sys.exit()
+        except Exception as e:
+            shellDetected.close()
+            print(tabulation + red('ERROR:') + e)
+            sys.exit()
+
+        if verbose:
+            print(f'{tabulation}{green("Processing finished")}')
+            print()
+
+    addToProcessedFile(processedInfos)
+
+    count = len(list(processedInfos.keys()))
+    print(
+        f'{tabulation}{magenta("tRNAs-SeC preprocessing ended | ") + numberP(count) + magenta(" genomes processed & ") + numberP(skipped) + magenta(" skipped"):^145}'
     )
     separator()
