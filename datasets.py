@@ -902,7 +902,17 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
     separator()
 
 def alignMAFFT(__processedFile=None, __alignFile=None, progress=0):
-    global globalProcessedFile, globalAlignFile
+    if __processedFile == None:
+        global globalProcessedFile
+        processedFile = globalProcessedFile
+    else:
+        processedFile = __processedFile
+
+    if __alignFile == None:
+        global globalAlignFile
+        alignFile = globalAlignFile
+    else:
+        alignFile = __alignFile
     
     with open(globalDetectedFile, 'r') as fileHandler:
         numberGenomes = len(fileHandler.readlines())
@@ -913,7 +923,7 @@ def alignMAFFT(__processedFile=None, __alignFile=None, progress=0):
         if not progress:
             args += ' --quiet'
 
-        shellMAFFT = os.popen(f'mafft {args} "{globalProcessedFile}" > "{globalAlignFile}"')
+        shellMAFFT = os.popen(f'mafft {args} "{processedFile}" > "{alignFile}"')
         _ = shellMAFFT.read()
         shellMAFFT.close()
     except KeyboardInterrupt:
