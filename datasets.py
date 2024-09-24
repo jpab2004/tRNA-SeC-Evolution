@@ -306,6 +306,7 @@ def downloadGenomes(
         __genomesPath=None,
         __readyFile=None,
         __fetchFile=None,
+        referenceRange=None,
         verbose=1,
         progressbar=0,
         sizeLimit=15,
@@ -332,8 +333,13 @@ def downloadGenomes(
     if not createdReadyFile:
         createReadyFile()
 
+    if referenceRange == None:
+        organismsNamesSorted = list(organisms.keys())
+    else:
+        organismsNamesSorted = list(organisms.keys())[referenceRange[0]:referenceRange[1]]
+
     print(f'{tabulation}{magenta("Genomes download starting"):^120}\n')
-    for i, organismName in enumerate(organisms, 1):
+    for i, organismName in enumerate(organismsNamesSorted, 1):
         organism = organisms[organismName]
         accession = organism['accession']
         size, unit = organism['filesize-unit']
@@ -478,7 +484,7 @@ def downloadGenomes(
     addToReadyFile(readyInfos, __readyFile)
     addToFetchFile(fetchInfos, __fetchFile)
 
-    totalTemp = len(list(organisms.keys()))
+    totalTemp = len(organismsNamesSorted)
     fetchTemp = len(list(fetchInfos.keys()))
     downloadedTemp = totalTemp - fetchTemp - found - lost
     print(
@@ -703,7 +709,7 @@ def trnaScanSE(__readyFile=None, verbose=1):
     shellGrepNumber.close()
 
     print(
-        f'{tabulation}{numberP(len(list(readyInfos.keys()))) + magenta(" genomes analysed and ") + numberP(totalHits) + magenta(" tRNA-SeCs found | ") +
+        f'{tabulation}{numberP(len(list(readyInfos.keys())) - found) + magenta(" genomes analysed and ") + numberP(totalHits) + magenta(" tRNA-SeCs found | ") +
         numberP(found) + magenta(" already analysed & ") + numberP(skipped) + magenta(" skipped"):^180}'
     )
     separator()
@@ -813,8 +819,9 @@ def findDetectedSeC(__readyFile=None, __detectedFile=None, verbose=1):
     addToDetectedFile(detectedInfos, __detectedFile)
 
     totalHits = len(list(detectedInfos.keys())) - foundPlus
+    tempPassed = len(list(readyInfos.keys())) - foundPlus - foundMinus
     print(
-        f'{tabulation}{numberP(len(list(readyInfos.keys()))) + magenta(" genomes passed detection and ") + numberP(totalHits) + magenta(" tRNAs-SeC were found | ")
+        f'{tabulation}{numberP(tempPassed) + magenta(" genomes passed detection and ") + numberP(totalHits) + magenta(" tRNAs-SeC were found | ")
         + numberP(foundPlus + foundMinus) + magenta(" already passed (") + numberP(foundPlus) + magenta("+ ") + numberP(foundMinus) + magenta("-) & ")
         + numberP(skipped) + magenta(" skipped"):^220}'
     )
