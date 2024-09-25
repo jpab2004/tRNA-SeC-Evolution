@@ -42,14 +42,15 @@ __taxons = {
 
 
 parser=argparse.ArgumentParser()
-parser.add_argument("--genomes-path", help="Path for the genomes to be stored.")
-parser.add_argument("--fetch-file", help="The name for the default fetch file information.")
-parser.add_argument("--ready-file", help="The name for the default ready file information.")
-parser.add_argument("--detected-file", help="The name for the default detected file information.")
-parser.add_argument("--processed-file", help="The name for the default processed file information.")
-parser.add_argument("--align-file", help="The name for the default alignment file.")
-parser.add_argument("--taxon", help="The name for the taxon to be analysed.")
-parser.add_argument("--reference-range", help="Range of organisms in the taxon to be analysed.")
+parser.add_argument('--genomes-path', help='Path for the genomes to be stored.')
+parser.add_argument('--fetch-file', help='The name for the default fetch file information.')
+parser.add_argument('--ready-file', help='The name for the default ready file information.')
+parser.add_argument('--detected-file', help='The name for the default detected file information.')
+parser.add_argument('--processed-file', help='The name for the default processed file information.')
+parser.add_argument('--align-file', help='The name for the default alignment file.')
+parser.add_argument('--taxon', help='The name for the taxon to be analysed.')
+parser.add_argument('--reference-range', help='Range of organisms in the taxon to be analysed.')
+parser.add_argument('--range-step', help='The step of the range')
 args=parser.parse_args()
 
 genomesPath = args.genomes_path if args.genomes_path != None else 'Genomes/'
@@ -59,24 +60,31 @@ detectedFile = args.detected_file if args.detected_file != None else 'detected'
 processedFile = args.processed_file if args.processed_file != None else 'processed'
 alignFile = args.align_file if args.align_file != None else 'align'
 taxons = eval(args.taxon) if args.taxon != None else __taxons
-referenceRange = eval(args.reference_range)
+referenceRange = int(args.reference_range) if args.taxon != None else None
+rangeStep = int(args.range_step) if args.range_step != None else 1
 
 
+
+suffix = ''
+if referenceRange != None:
+    suffix = f'_{referenceRange}*{rangeStep}'
 
 files = {
     '__genomesPath': genomesPath,
-    '__fetchFile': fetchFile,
-    '__readyFile': readyFile,
-    '__detectedFile': detectedFile,
-    '__processedFile': processedFile,
+    '__fetchFile': fetchFile + suffix,
+    '__readyFile': readyFile + suffix,
+    '__detectedFile': detectedFile + suffix,
+    '__processedFile': processedFile + suffix,
     '__alignFile': alignFile
 }
 initiate(**files)
 
 species = collectInfo(taxons)
-downloadGenomes(species, sizeLimit=20, referenceRange=referenceRange)
+downloadGenomes(species, sizeLimit=20, referenceRange=referenceRange, rangeStep=rangeStep)
 downloadFetch()
 trnaScanSE()
 findDetectedSeC()
 preprocessSeC()
-alignMAFFT()
+
+if referenceRange == None:
+    alignMAFFT()

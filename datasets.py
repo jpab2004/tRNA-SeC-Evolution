@@ -255,44 +255,47 @@ def collectInfo(taxons, verbose=1, debug=0):
     separator()
     print(f'{tabulation}{magenta("Data collection starting"):^120}\n')
     for i, (taxon, (popularName, kingdom)) in enumerate(sorted(taxons.items()), 1):
-        command = f'datasets summary genome taxon "{taxon}" --reference --assembly-source RefSeq 2>&1'
+        command = f'datasets summary genome taxon "{taxon}" --reference --assembly-source RefSeq --as-json-lines 2>&1'
         shell = os.popen(command)
-        summaryRead = shell.read()
+        summaryRead = shell.read().replace('true', "'true'")[:-1]
         name = f'{i}. {taxon}'
-
-        try:
-            summary = ast.literal_eval(summaryRead.replace('true', '"true"'))
-            if debug:
-                pretty(summary)
-        except Exception as e:
-            if 'but no genome data is currently available for this taxon' in summaryRead:
-                printCollection(name, 0, 2, popularName=popularName)
-                continue
-            elif 'New version of client' in summaryRead:
-                printCollection('', 0, 3)
-                continue
-            else:
-                printCollection(name, 0, 4, popularName=popularName, summaryRead=summaryRead[:300])
-                print(e, len(summaryRead))
-                continue
-        
         shell.close()
 
+        if 'but no genome data is currently available for this taxon' in summaryRead:
+            printCollection(name, 0, 2, popularName=popularName)
+            continue
+        elif 'New version of client' in summaryRead:
+            printCollection('', 0, 3)
+            continue
+
+        summary = {}
+        for j, summa in enumerate(summaryRead.split('\n')):
+            try:
+                summary[j] = ast.literal_eval(summa)
+            except Exception as e:
+                print(j, summa, e)
+                sys.exit()
+        
+        numberOfOrganisms = 0
         try:
-            for report in summary['reports']:
-                speciesName = report['organism']['organism_name']
-                species[speciesName]['accession'] = report['accession']
-                species[speciesName]['filesize-unit'] = sizeOf(int(report["assembly_stats"]["total_sequence_length"]))
-                species[speciesName]['popular-name'] = popularName
-                species[speciesName]['kingdom'] = kingdom
+            for report in summary.values():
+                try:
+                    speciesName = report['organism']['organism_name']
+                    species[speciesName]['accession'] = report['accession']
+                    species[speciesName]['filesize-unit'] = sizeOf(int(report["assembly_stats"]["total_sequence_length"]))
+                    species[speciesName]['popular-name'] = popularName
+                    species[speciesName]['kingdom'] = kingdom
+                    numberOfOrganisms += 1
+                except Exception as e:
+                    print(summary, e)
 
             if verbose:
-                numberOfOrganisms = len(summary['reports'])
                 printCollection(name, numberOfOrganisms, 1, popularName=popularName)
-        except:
+        except Exception as e:
+            print(report, e)
             printCollection(name, 0, 0, popularName=popularName)
 
-    print(f'\n{tabulation}{magenta(f"Data collection ended") + " | " + numberP(len(list(species.keys()))) + magenta(" total organisms collected"):^140}')
+    print(f'\n{tabulation}{magenta(f"Data collection ended") + " | " + numberP(numberOfOrganisms) + magenta(" total organisms collected"):^140}')
     separator()
 
     if debug:
@@ -309,6 +312,7 @@ def downloadGenomes(
         __readyFile=None,
         __fetchFile=None,
         referenceRange=None,
+        rangeStep=None,
         verbose=1,
         progressbar=0,
         sizeLimit=15,
@@ -338,7 +342,18 @@ def downloadGenomes(
     if referenceRange == None:
         organismsNamesSorted = list(organisms.keys())
     else:
-        organismsNamesSorted = list(organisms.keys())[referenceRange[0]:referenceRange[1]]
+        if rangeStep == None:
+            rangeStep = 1
+
+        range1 = referenceRange * (rangeStep - 1)
+        range2 = referenceRange + (referenceRange * (rangeStep - 1))
+        
+        if range1 > len(list(organisms.keys())):
+            range1 = len(list(organisms.keys())) - referenceRange
+        if range2 > len(list(organisms.keys())):
+            range2 = len(list(organisms.keys()))
+
+        organismsNamesSorted = list(organisms.keys())[range1:range2]
 
     print(f'{tabulation}{magenta("Genomes download starting"):^120}\n')
     for i, organismName in enumerate(organismsNamesSorted, 1):
