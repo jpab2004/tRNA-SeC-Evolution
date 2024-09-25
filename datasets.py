@@ -705,9 +705,19 @@ def trnaScanSE(__readyFile=None, verbose=1):
                 peT(green('Finished'))
         except KeyboardInterrupt:
             shellTRNA.close()
+
+            shellRemoveHit = os.popen(f'rm {fileToAnalyse[:-4]}.hits')
+            _ = shellRemoveHit.read()
+            shellRemoveHit.close()
+
             sys.exit()
         except Exception as e:
             shellTRNA.close()
+
+            shellRemoveHit = os.popen(f'rm {fileToAnalyse[:-4]}.hits')
+            _ = shellRemoveHit.read()
+            shellRemoveHit.close()
+            
             print(tabulation + red('ERROR:') + e)
             sys.exit()
 
