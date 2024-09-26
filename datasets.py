@@ -166,12 +166,13 @@ def addToFetchFile(fetchInfos, __fetchFile=None):
     with open(fetchFile, 'a') as fileHandler:
         for name in fetchInfos:
             accession = fetchInfos[name]['accession']
+            taxId = fetchInfos[name]['tax-id']
             fetchFolderPath = fetchInfos[name]['fetch-folder'].strip('\n')
             chromosomesFolderPath = fetchInfos[name]['chromosomes-folder'].strip('\n')
             popularName = fetchInfos[name]['popular-name']
             kingdom = fetchInfos[name]['kingdom']
 
-            fileHandler.write(f'{accession} > {name} > {popularName} > {fetchFolderPath} > {chromosomesFolderPath} > {kingdom}\n')
+            fileHandler.write(f'{accession} > {name} > {taxId} > {popularName} > {fetchFolderPath} > {chromosomesFolderPath} > {kingdom}\n')
 
 def addToReadyFile(readyInfos, __readyFile=None):
     if __readyFile == None:
@@ -186,11 +187,12 @@ def addToReadyFile(readyInfos, __readyFile=None):
     with open(readyFile, 'a') as fileHandler:
         for name in readyInfos:
             accession = readyInfos[name]['accession']
+            taxId = readyInfos[name]['tax-id']
             chromosomesFolderPath = readyInfos[name]['chromosomes-folder'].strip('\n')
             popularName = readyInfos[name]['popular-name']
             kingdom = readyInfos[name]['kingdom']
 
-            fileHandler.write(f'{accession} > {name} > {popularName} > {chromosomesFolderPath} > {kingdom}\n')
+            fileHandler.write(f'{accession} > {name} > {taxId} > {popularName} > {chromosomesFolderPath} > {kingdom}\n')
 
 def addToDetectedFile(detectedInfos, __detectedFile=None):
     if __detectedFile == None:
@@ -205,11 +207,12 @@ def addToDetectedFile(detectedInfos, __detectedFile=None):
     with open(detectedFile, 'a') as fileHandler:
         for name in detectedInfos:
             accession = detectedInfos[name]['accession']
+            taxId = detectedInfos[name]['tax-id']
             chromosomesFolderPath = detectedInfos[name]['chromosomes-folder'].strip('\n')
             popularName = detectedInfos[name]['popular-name']
             kingdom = detectedInfos[name]['kingdom']
 
-            fileHandler.write(f'{accession} > {name} > {popularName} > {chromosomesFolderPath} > {kingdom}\n')
+            fileHandler.write(f'{accession} > {name} > {taxId} > {popularName} > {chromosomesFolderPath} > {kingdom}\n')
 
 def addToProcessedFile(processedInfos, __processedFile=None):
     if __processedFile == None:
@@ -281,6 +284,7 @@ def collectInfo(taxons, verbose=1, debug=0):
             for report in summary.values():
                 try:
                     speciesName = report['organism']['organism_name']
+                    species[speciesName]['tax-id'] = report['organism']['tax_id']
                     species[speciesName]['accession'] = report['accession']
                     species[speciesName]['filesize-unit'] = sizeOf(int(report["assembly_stats"]["total_sequence_length"]))
                     species[speciesName]['popular-name'] = popularName
@@ -533,7 +537,14 @@ def downloadFetch(__fetchFile=None, __readyFile=None, verbose=1, progressbar=0):
     readyInfos = {}
     for info in fetchLines:
         splitted = info.strip('\n').split(' > ')
-        fetchInfos[splitted[1]] = {'accession': splitted[0], 'popular-name': splitted[2], 'fetch-folder': splitted[3], 'chromosomes-folder': splitted[4], 'kingdom': splitted[5]}
+        fetchInfos[splitted[1]] = {
+            'accession': splitted[0],
+            'tax-id': splitted[2],
+            'popular-name': splitted[3],
+            'fetch-folder': splitted[4],
+            'chromosomes-folder': splitted[5],
+            'kingdom': splitted[6]
+        }
 
     lost = 0
     found = 0
@@ -652,9 +663,15 @@ def trnaScanSE(__readyFile=None, verbose=1):
     readyInfos = {}
     for info in readyLines:
         splitted = info.strip('\n').split(' > ')
-        popularName = splitted[2] if splitted[2] != 'None' else None
+        popularName = splitted[3] if splitted[3] != 'None' else None
 
-        readyInfos[splitted[1]] = {'accession': splitted[0], 'popular-name': popularName, 'chromosomes-folder': splitted[3], 'kingdom': splitted[4]}
+        readyInfos[splitted[1]] = {
+            'accession': splitted[0],
+            'tax-id': splitted[2],
+            'popular-name': popularName,
+            'chromosomes-folder': splitted[4],
+            'kingdom': splitted[5]
+        }
 
     found = 0
     skipped = 0
@@ -761,9 +778,15 @@ def findDetectedSeC(__readyFile=None, __detectedFile=None, verbose=1):
     readyInfos = {}
     for info in readyLines:
         splitted = info.strip('\n').split(' > ')
-        popularName = splitted[2] if splitted[2] != 'None' else None
+        popularName = splitted[3] if splitted[3] != 'None' else None
 
-        readyInfos[splitted[1]] = {'accession': splitted[0], 'popular-name': popularName, 'chromosomes-folder': splitted[3], 'kingdom': splitted[4]}
+        readyInfos[splitted[1]] = {
+            'accession': splitted[0],
+            'tax-id': splitted[2],
+            'popular-name': popularName,
+            'chromosomes-folder': splitted[4],
+            'kingdom': splitted[5]
+        }
 
     skipped = 0
     foundPlus = 0
@@ -875,9 +898,15 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
     detectedInfos = {}
     for info in detectedLines:
         splitted = info.strip('\n').split(' > ')
-        popularName = splitted[2] if splitted[2] != 'None' else None
+        popularName = splitted[3] if splitted[3] != 'None' else None
 
-        detectedInfos[splitted[1]] = {'accession': splitted[0], 'popular-name': popularName, 'chromosomes-folder': splitted[3], 'kingdom': splitted[4]}
+        detectedInfos[splitted[1]] = {
+            'accession': splitted[0],
+            'tax-id': splitted[2],
+            'popular-name': popularName,
+            'chromosomes-folder': splitted[4],
+            'kingdom': splitted[5]
+        }
 
     count = 0
     tRNAs = 0
@@ -890,6 +919,7 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
         popularName = detectedInfos[organismName]['popular-name']
         accession = detectedInfos[organismName]['accession']
         kingdom = detectedInfos[organismName]['kingdom']
+        taxId = detectedInfos[organismName]['tax-id']
         name = f'{i}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
 
         if (verbose):            
@@ -923,7 +953,9 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
                 strand, size, score = headerInfos[2], headerInfos[5], headerInfos[8]
 
                 #f'>{kingdom}.{organismName.replace(" ", "_")}.{tRNANumber} | {kingdom}_{chromosomeState}.{chromosomeNumber}:{chromosomePosition} | {strand}_{size}_{score}'
-                headerFinal = f'>{kingdom}.SeC-{j}.{organismName.replace(" ", "_")}'
+                headerFinal = f'>{kingdom}.SeC-{j}.{organismName.replace(".", " ").replace(" ", "_")}'
+                # headerFinal = f'>{taxId}.SeC-{j}.{organismName.replace(" ", "_")}'
+                # headerFinal = f'>{taxId}.{j}'dsadas
 
                 # processedInfos[f'{organismName}.{j}'] = {'info': detectedInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
                 processedInfos[f'{organismName}.{j}'] = {'info': detectedInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
