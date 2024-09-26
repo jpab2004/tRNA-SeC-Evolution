@@ -463,7 +463,7 @@ def downloadGenomes(
                 pe(magenta(result))
                 skipped += 1
 
-                cotinue
+                continue
         except KeyboardInterrupt:
             sys.exit()
         except Exception as e:
@@ -879,6 +879,7 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
 
         detectedInfos[splitted[1]] = {'accession': splitted[0], 'popular-name': popularName, 'chromosomes-folder': splitted[3], 'kingdom': splitted[4]}
 
+    count = 0
     tRNAs = 0
     skipped = 0
     processedInfos = {}
@@ -921,17 +922,19 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
                 chromosomePosition = headerInfos[1].split(':')[1]
                 strand, size, score = headerInfos[2], headerInfos[5], headerInfos[8]
 
-                headerFinal = f'>{organismName.replace(" ", "_")}.SeC-{j}.{kingdom}'
+                #f'>{kingdom}.{organismName.replace(" ", "_")}.{tRNANumber} | {kingdom}_{chromosomeState}.{chromosomeNumber}:{chromosomePosition} | {strand}_{size}_{score}'
+                headerFinal = f'>{kingdom}.SeC-{j}.{organismName.replace(" ", "_")}'
 
                 # processedInfos[f'{organismName}.{j}'] = {'info': detectedInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
                 processedInfos[f'{organismName}.{j}'] = {'info': detectedInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
                 tRNAs += 1
+            count += 1
         except KeyboardInterrupt:
             shellDetected.close()
             sys.exit()
         except Exception as e:
             shellDetected.close()
-            print(tabulation + red('ERROR:') + e)
+            print(tabulation + red('ERROR:') + str(e))
             sys.exit()
 
         if verbose:
@@ -940,7 +943,6 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
 
     addToProcessedFile(processedInfos, __processedFile)
 
-    count = len(list(processedInfos.keys()))
     print(
         f'{tabulation}{magenta("tRNAs-SeC preprocessing ended | ") + numberP(count) + magenta(" genomes processed (") + numberP(tRNAs) + magenta(" tRNAs-SeC) & ") +
         numberP(skipped) + magenta(" skipped"):^175}'
