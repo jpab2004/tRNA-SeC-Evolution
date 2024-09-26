@@ -457,6 +457,13 @@ def downloadGenomes(
                 skipped += 1
 
                 continue
+
+            if 'Error' in result:
+                pm(red('Error'))
+                pe(magenta(result))
+                skipped += 1
+
+                cotinue
         except KeyboardInterrupt:
             sys.exit()
         except Exception as e:
@@ -761,6 +768,7 @@ def findDetectedSeC(__readyFile=None, __detectedFile=None, verbose=1):
     skipped = 0
     foundPlus = 0
     foundMinus = 0
+    detectedPlus = 0
     detectedInfos = {}
 
     print(f'{tabulation}{magenta(f"Detected tRNAs-SeC analysis starting" + " | " + numberP(len(readyLines)) + magenta(" genomes")):^140}\n')
@@ -827,6 +835,7 @@ def findDetectedSeC(__readyFile=None, __detectedFile=None, verbose=1):
 
         if numberDetected > 0:
             detectedInfos[organismName] = readyInfos[organismName]
+            detectedPlus += numberDetected
 
             shellTouch = os.popen('> "../detected+.status"')
             _ = shellTouch.read()
@@ -845,10 +854,9 @@ def findDetectedSeC(__readyFile=None, __detectedFile=None, verbose=1):
 
     addToDetectedFile(detectedInfos, __detectedFile)
 
-    totalHits = len(list(detectedInfos.keys())) - foundPlus
     tempPassed = len(list(readyInfos.keys())) - foundPlus - foundMinus
     print(
-        f'{tabulation}{numberP(tempPassed) + magenta(" genomes passed detection and ") + numberP(totalHits) + magenta(" tRNAs-SeC were found | ")
+        f'{tabulation}{numberP(tempPassed) + magenta(" genomes passed detection and ") + numberP(detectedPlus) + magenta(" tRNAs-SeC were found | ")
         + numberP(foundPlus + foundMinus) + magenta(" already passed (") + numberP(foundPlus) + magenta("+ ") + numberP(foundMinus) + magenta("-) & ")
         + numberP(skipped) + magenta(" skipped"):^220}'
     )
@@ -871,6 +879,7 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
 
         detectedInfos[splitted[1]] = {'accession': splitted[0], 'popular-name': popularName, 'chromosomes-folder': splitted[3], 'kingdom': splitted[4]}
 
+    tRNAs = 0
     skipped = 0
     processedInfos = {}
 
@@ -901,20 +910,22 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
 
         try:
             shellDetected = os.popen(f'cat *.hits | grep "SeC" -A 2')
-            detectedTRNA = shellDetected.read()[:-1]
+            detectedTRNA = shellDetected.read()[:-1].replace('--\n', '').split('\n')
             shellDetected.close()
 
-            parts = detectedTRNA.split('\n')
-            headerInfos = parts[0].split(' ')
-            tRNASequence = parts[1] + parts[2]
+            for j, parts in enumerate(zip(detectedTRNA[::3], detectedTRNA[1::3], detectedTRNA[2::3]), 1):
+                headerInfos = parts[0].split(' ')
+                tRNASequence = parts[1] + parts[2]
 
-            chromosomeState, chromosomeNumber, tRNANumber = headerInfos[0][1:].split('.')
-            chromosomePosition = headerInfos[1].split(':')[1]
-            strand, size, score = headerInfos[2], headerInfos[5], headerInfos[8]
+                chromosomeState, chromosomeNumber, tRNANumber = headerInfos[0][1:].split('.')
+                chromosomePosition = headerInfos[1].split(':')[1]
+                strand, size, score = headerInfos[2], headerInfos[5], headerInfos[8]
 
-            headerFinal = f'>{organismName.replace(" ", "_")} | {kingdom}_{chromosomeState}.{chromosomeNumber}:{chromosomePosition} | {strand}_{size}_{score}'
+                headerFinal = f'>{organismName.replace(" ", "_")}.SeC-{j}.{kingdom}'
 
-            processedInfos[organismName] = {'info': detectedInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
+                # processedInfos[f'{organismName}.{j}'] = {'info': detectedInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
+                processedInfos[f'{organismName}.{j}'] = {'info': detectedInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
+                tRNAs += 1
         except KeyboardInterrupt:
             shellDetected.close()
             sys.exit()
@@ -931,7 +942,8 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
 
     count = len(list(processedInfos.keys()))
     print(
-        f'{tabulation}{magenta("tRNAs-SeC preprocessing ended | ") + numberP(count) + magenta(" genomes processed & ") + numberP(skipped) + magenta(" skipped"):^155}'
+        f'{tabulation}{magenta("tRNAs-SeC preprocessing ended | ") + numberP(count) + magenta(" genomes processed (") + numberP(tRNAs) + magenta(" tRNAs-SeC) & ") +
+        numberP(skipped) + magenta(" skipped"):^175}'
     )
     separator()
 

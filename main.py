@@ -60,7 +60,7 @@ detectedFile = args.detected_file if args.detected_file != None else 'detected'
 processedFile = args.processed_file if args.processed_file != None else 'processed'
 alignFile = args.align_file if args.align_file != None else 'align'
 taxons = eval(args.taxon) if args.taxon != None else __taxons
-referenceRange = int(args.reference_range) if args.taxon != None else None
+referenceRange = int(args.reference_range) if args.reference_range != None else None
 rangeStep = int(args.range_step) if args.range_step != None else 1
 
 
