@@ -1,6 +1,6 @@
 from datasets import collectInfo, downloadGenomes, downloadFetch, trnaScanSE, findDetectedSeC, preprocessSeC, alignMAFFT
 from datasets import initiate, pretty
-import os, argparse
+import os, argparse, sys
 
 
 
@@ -42,15 +42,27 @@ __taxons = {
 
 
 parser=argparse.ArgumentParser()
+
 parser.add_argument('--genomes-path', help='Path for the genomes to be stored.')
 parser.add_argument('--fetch-file', help='The name for the default fetch file information.')
 parser.add_argument('--ready-file', help='The name for the default ready file information.')
 parser.add_argument('--detected-file', help='The name for the default detected file information.')
 parser.add_argument('--processed-file', help='The name for the default processed file information.')
 parser.add_argument('--align-file', help='The name for the default alignment file.')
+
 parser.add_argument('--taxon', help='The name for the taxon to be analysed.')
 parser.add_argument('--reference-range', help='Range of organisms in the taxon to be analysed.')
-parser.add_argument('--range-step', help='The step of the range')
+parser.add_argument('--range-step', help='The step of the range.')
+
+parser.add_argument('--recycle-overload', help='Force recycling on genomes.', action='store_true')
+parser.add_argument('--re-download', help='Force re download of genomes.', action='store_true')
+
+parser.add_argument('-QD', '--q-download', help='Quiet for download.', action='store_false')
+parser.add_argument('-QF', '--q-fetch', help='Quiet for fetch.', action='store_false')
+parser.add_argument('-QS', '--q-scan', help='Quiet for scan.', action='store_false')
+parser.add_argument('-QDE', '--q-detected', help='Quiet for detected tRNAs-SeC.', action='store_false')
+parser.add_argument('-QP', '--q-preprocess', help='Quiet for preprocess tRNAs-SeC.', action='store_false')
+
 args=parser.parse_args()
 
 genomesPath = args.genomes_path if args.genomes_path != None else 'Genomes/'
@@ -59,9 +71,19 @@ readyFile = args.ready_file if args.ready_file != None else 'ready'
 detectedFile = args.detected_file if args.detected_file != None else 'detected'
 processedFile = args.processed_file if args.processed_file != None else 'processed'
 alignFile = args.align_file if args.align_file != None else 'align'
+
 taxons = eval(args.taxon) if args.taxon != None else __taxons
 referenceRange = int(args.reference_range) if args.reference_range != None else None
 rangeStep = int(args.range_step) if args.range_step != None else 1
+
+recycleOverload = args.recycle_overload
+reDownload = args.re_download
+
+verboseDownload = args.q_download
+verboseFetch = args.q_fetch
+verboseScan = args.q_scan
+verboseDetected = args.q_detected
+verbosePreprocess = args.q_preprocess
 
 
 
@@ -80,11 +102,11 @@ files = {
 initiate(**files)
 
 species = collectInfo(taxons)
-downloadGenomes(species, sizeLimit=20, referenceRange=referenceRange, rangeStep=rangeStep)
-downloadFetch()
-trnaScanSE()
-findDetectedSeC()
-preprocessSeC()
+downloadGenomes(species, sizeLimit=20, referenceRange=referenceRange, rangeStep=rangeStep, reDownload=reDownload, verbose=verboseDownload)
+downloadFetch(verbose=verboseFetch)
+trnaScanSE(recycleOverload=recycleOverload, verbose=verboseScan)
+findDetectedSeC(verbose=verboseDetected)
+preprocessSeC(verbose=verbosePreprocess)
 
 if referenceRange == None:
     alignMAFFT()
