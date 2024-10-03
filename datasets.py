@@ -687,7 +687,7 @@ def downloadFetch(__fetchFile=None, __readyFile=None, verbose=1, progressbar=0):
 
 
 
-def trnaScanSE(__readyFile=None, verbose=1, recycle=1, recycleOverload=0):
+def trnaScanSE(__readyFile=None, verbose=1, recycle=1):
     if __readyFile == None:
         global globalReadyFile
         readyFile = globalReadyFile
@@ -731,34 +731,7 @@ def trnaScanSE(__readyFile=None, verbose=1, recycle=1, recycleOverload=0):
             if verbose:
                 ps(green('Already analysed'))
                 pe(magenta('Skipping organism'))
-                if (not recycleOverload):
-                    print()
-
-            shellRecycled.read()
-            recycledBool = not bool(shellRecycled.read())
-            shellRecycled.close()
-            if ((recycleOverload) and (recycledBool)):
-                try:
-                    os.chdir(chromosomesFolder)
-                    filesToAnalyse = list(glob.glob('*.fna'))
-                    filesToAnalyse.sort()
-                    first = True
-
-                    for fileToAnalyse in filesToAnalyse:
-                        bigFile = 0 if fileToAnalyse == 'chromosome.fna' else 1
-                        recycleFile(fileToAnalyse, big=bigFile)
-                        if first:
-                            recycleFile(fileToAnalyse, big=bigFile)
-                            first = False
-                    if verbose:
-                        print(f'{tabulation}{red("Forcefully recycled")}')
-                        print()
-                except KeyboardInterrupt:
-                    sys.exit()
-                except Exception as e:                    
-                    print(tabulation + red('ERROR:') + str(e))
-                    sys.exit()
-            
+                print()
             continue
         
         try:
@@ -786,8 +759,26 @@ def trnaScanSE(__readyFile=None, verbose=1, recycle=1, recycleOverload=0):
                 shellChromosomeAnalysed = os.popen(f'if [ -e {chromosomesFolder}/{fileToAnalyse[:-4]}.hits ]; then echo "1"; else echo "0"; fi;')
                 if int(shellChromosomeAnalysed.read()):
                     if verbose:
-                        peT(green('Already analysed') + ' | ' + magenta('Skipping chromosome'))
+                        pm(green('Already analysed'))
+
+                    if recycle:
+                        shellRecycled = os.popen(f'if [ -e {globalGenomesPath}/{accession}/recycled.status ]; then echo "1"; else echo "0"; fi;')
+                        shellRecycled.read()
+                        recycledBool = not bool(shellRecycled.read())
+                        shellRecycled.close()
+                        if recycledBool:
+                            bigFile = 0 if fileToAnalyse == 'chromosome.fna' else 1
+                            recycleFile(fileToAnalyse, big=bigFile)
+                            if verbose:
+                                pm(red('chromosome recycled'))
+
+                    if verbose:
+                        peT(magenta('Skipping chromosome'))
+
+                    shellChromosomeAnalysed.close()
                     continue
+
+                shellChromosomeAnalysed.close()
 
                 shellTRNA = os.popen(f'tRNAscan-SE -{kingdom} {fileToAnalyse} -q --detail -D -Q -a {fileToAnalyse[:-4]}.hits')
                 _ = shellTRNA.read()
@@ -797,7 +788,7 @@ def trnaScanSE(__readyFile=None, verbose=1, recycle=1, recycleOverload=0):
                     bigFile = 0 if fileToAnalyse == 'chromosome.fna' else 1
                     recycleFile(fileToAnalyse, big=bigFile)
                     if verbose:
-                        pm(magenta('chromosome recycled'))
+                        pm(red('chromosome recycled'))
 
                 if verbose:
                     peT(green('Finished'))

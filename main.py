@@ -54,7 +54,6 @@ parser.add_argument('--taxon', help='The name for the taxon to be analysed.')
 parser.add_argument('--reference-range', help='Range of organisms in the taxon to be analysed.')
 parser.add_argument('--range-step', help='The step of the range.')
 
-parser.add_argument('--recycle-overload', help='Force recycling on genomes.', action='store_true')
 parser.add_argument('--re-download', help='Force re download of genomes.', action='store_true')
 
 parser.add_argument('-QD', '--q-download', help='Quiet for download.', action='store_false')
@@ -76,7 +75,6 @@ taxons = eval(args.taxon) if args.taxon != None else __taxons
 referenceRange = int(args.reference_range) if args.reference_range != None else None
 rangeStep = int(args.range_step) if args.range_step != None else 1
 
-recycleOverload = args.recycle_overload
 reDownload = args.re_download
 
 verboseDownload = args.q_download
@@ -104,7 +102,7 @@ initiate(**files)
 species = collectInfo(taxons)
 downloadGenomes(species, sizeLimit=20, referenceRange=referenceRange, rangeStep=rangeStep, reDownload=reDownload, verbose=verboseDownload)
 downloadFetch(verbose=verboseFetch)
-trnaScanSE(recycleOverload=recycleOverload, verbose=verboseScan)
+trnaScanSE(verbose=verboseScan)
 findDetectedSeC(verbose=verboseDetected)
 preprocessSeC(verbose=verbosePreprocess)
 
