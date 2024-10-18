@@ -252,13 +252,14 @@ def pretty(value, sort_keys=True, indent=4, colorOrder=[green, blue, red, cyan, 
 
 
 # Collection of organism data (accession and assembly level)
-def collectInfo(taxons, verbose=1, debug=0):
+def collectInfo(taxons, verbose=1, debug=0, archaea=0):
     species = defaultdict(lambda: {'accession': None})
 
     separator()
     print(f'{tabulation}{magenta("Data collection starting"):^120}\n')
     for i, (taxon, (popularName, kingdom)) in enumerate(sorted(taxons.items()), 1):
-        command = f'datasets summary genome taxon "{taxon}" --reference --assembly-source RefSeq --as-json-lines 2>&1'
+        command = f'datasets summary genome taxon "{taxon}"'
+        command += f' --reference --assembly-source RefSeq --as-json-lines 2>&1' if (not archaea) else ' --assembly-source RefSeq --as-json-lines 2>&1'
         shell = os.popen(command)
         summaryRead = shell.read().replace('true', "'true'")[:-1]
         name = f'{i}. {taxon}'

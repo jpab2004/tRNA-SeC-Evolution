@@ -55,6 +55,7 @@ parser.add_argument('--reference-range', help='Range of organisms in the taxon t
 parser.add_argument('--range-step', help='The step of the range.')
 
 parser.add_argument('--re-download', help='Force re download of genomes.', action='store_true')
+parser.add_argument('--refseq', help='Use RefSeq expanded search.', action='store_true')
 
 parser.add_argument('-QD', '--q-download', help='Quiet for download.', action='store_false')
 parser.add_argument('-QF', '--q-fetch', help='Quiet for fetch.', action='store_false')
@@ -64,7 +65,7 @@ parser.add_argument('-QP', '--q-preprocess', help='Quiet for preprocess tRNAs-Se
 
 args=parser.parse_args()
 
-genomesPath = args.genomes_path if args.genomes_path != None else 'Genomes/'
+genomesPath = args.genomes_path if args.genomes_path != None else 'GenomesArchaeaExpanded/'
 fetchFile = args.fetch_file if args.fetch_file != None else 'fetch'
 readyFile = args.ready_file if args.ready_file != None else 'ready'
 detectedFile = args.detected_file if args.detected_file != None else 'detected'
@@ -76,6 +77,7 @@ referenceRange = int(args.reference_range) if args.reference_range != None else 
 rangeStep = int(args.range_step) if args.range_step != None else 1
 
 reDownload = args.re_download
+refseq = args.refseq
 
 verboseDownload = args.q_download
 verboseFetch = args.q_fetch
@@ -99,7 +101,7 @@ files = {
 }
 initiate(**files)
 
-species = collectInfo(taxons)
+species = collectInfo(taxons, archaea=refseq)
 downloadGenomes(species, sizeLimit=20, referenceRange=referenceRange, rangeStep=rangeStep, reDownload=reDownload, verbose=verboseDownload)
 downloadFetch(verbose=verboseFetch)
 trnaScanSE(verbose=verboseScan)
