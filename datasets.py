@@ -786,13 +786,20 @@ def trnaScanSE(__readyFile=None, verbose=1, recycle=1):
                 shellTRNA.close()
 
                 if recycle:
-                    bigFile = 0 if fileToAnalyse == 'chromosome.fna' else 1
-                    recycleFile(fileToAnalyse, big=bigFile)
+                    recycleFile(fileToAnalyse)
                     if verbose:
                         pm(red('chromosome recycled'))
 
                 if verbose:
                     peT(green('Finished'))
+            
+            if recycle:
+                shellBig = os.popen(f'if [ -e {globalGenomesPath}/{accession}/fetched.status ]; then echo "1"; else echo "0"; fi;')
+                bigFile = int(shellBig.read())
+                recycleFile(None, recycleAll=1, big=bigFile)
+
+                if verbose:
+                    pprint(magenta('Everything recycled'))
         except KeyboardInterrupt:
             shellTRNA.close()
 
@@ -833,23 +840,25 @@ def trnaScanSE(__readyFile=None, verbose=1, recycle=1):
 
 
 
-def recycleFile(recycleFile, big=0):
-    shellRecycle = os.popen(f'rm {recycleFile}')
-    _ = shellRecycle.read()
-    shellRecycle.close()
+def recycleFile(recycleFile, recycleAll=0, big=0):
+    if recycleFile != None:
+        shellRecycle = os.popen(f'rm {recycleFile}')
+        _ = shellRecycle.read()
+        shellRecycle.close()
 
-    shellTouchRecycle = os.popen('> "../recycled.status"')
-    _ = shellTouchRecycle.read()
-    shellTouchRecycle.close()
+    if recycleAll:
+        shellTouchRecycle = os.popen('> "../recycled.status"')
+        _ = shellTouchRecycle.read()
+        shellTouchRecycle.close()
 
-    shellRemoveDownloaded = os.popen('rm "../downloaded.status"')
-    _ = shellRemoveDownloaded.read()
-    shellRemoveDownloaded.close()
+        shellRemoveDownloaded = os.popen('rm "../downloaded.status"')
+        _ = shellRemoveDownloaded.read()
+        shellRemoveDownloaded.close()
 
-    if big:
-        shellRemoveFetched = os.popen('rm "../fetched.status"')
-        _ = shellRemoveFetched.read()
-        shellRemoveFetched.close()
+        if big:
+            shellRemoveFetched = os.popen('rm "../fetched.status"')
+            _ = shellRemoveFetched.read()
+            shellRemoveFetched.close()
 
 
 
