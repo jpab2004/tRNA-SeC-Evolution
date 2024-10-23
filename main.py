@@ -57,6 +57,7 @@ parser.add_argument('--range-step', help='The step of the range.')
 parser.add_argument('--re-download', help='Force re download of genomes.', action='store_true')
 parser.add_argument('--refseq', help='Use RefSeq expanded search.', action='store_true')
 
+parser.add_argument('--quiet', help='Quiet printing.', action='store_false')
 parser.add_argument('-QD', '--q-download', help='Quiet for download.', action='store_false')
 parser.add_argument('-QF', '--q-fetch', help='Quiet for fetch.', action='store_false')
 parser.add_argument('-QS', '--q-scan', help='Quiet for scan.', action='store_false')
@@ -79,11 +80,19 @@ rangeStep = int(args.range_step) if args.range_step != None else 1
 reDownload = args.re_download
 refseq = args.refseq
 
-verboseDownload = args.q_download
-verboseFetch = args.q_fetch
-verboseScan = args.q_scan
-verboseDetected = args.q_detected
-verbosePreprocess = args.q_preprocess
+quiet = args.quiet
+if not quiet:
+    verboseDownload = 0
+    verboseFetch = 0
+    verboseScan = 0
+    verboseDetected = 0
+    verbosePreprocess = 0
+else:
+    verboseDownload = args.q_download
+    verboseFetch = args.q_fetch
+    verboseScan = args.q_scan
+    verboseDetected = args.q_detected
+    verbosePreprocess = args.q_preprocess
 
 
 
