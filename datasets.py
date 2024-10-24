@@ -1045,7 +1045,10 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
 
             for j, parts in enumerate(zip(detectedTRNA[::3], detectedTRNA[1::3], detectedTRNA[2::3]), 1):
                 headerInfos = parts[0].split(' ')
-                tRNASequence = parts[1] + parts[2]
+                if '>' in parts[2]:
+                    tRNASequence = parts[1]
+                else:
+                    tRNASequence = parts[1] + parts[2]
 
                 chromosomeState, chromosomeNumber, tRNANumber = headerInfos[0][1:].split('.')
                 chromosomePosition = headerInfos[1].split(':')[1]
