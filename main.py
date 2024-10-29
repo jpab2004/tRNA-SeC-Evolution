@@ -1,4 +1,4 @@
-from datasets import collectInfo, downloadGenomes, downloadFetch, trnaScanSE, findDetectedSeC, preprocessSeC, alignMAFFT
+from datasets import collectInfo, downloadGenomes, downloadFetch, trnaScanSE, findDetectedSeC, preprocessSeC, alignMAFFT, phylumDetection
 from datasets import initiate, pretty
 import os, argparse, sys
 
@@ -63,6 +63,7 @@ parser.add_argument('-QF', '--q-fetch', help='Quiet for fetch.', action='store_f
 parser.add_argument('-QS', '--q-scan', help='Quiet for scan.', action='store_false')
 parser.add_argument('-QDE', '--q-detected', help='Quiet for detected tRNAs-SeC.', action='store_false')
 parser.add_argument('-QP', '--q-preprocess', help='Quiet for preprocess tRNAs-SeC.', action='store_false')
+parser.add_argument('-QPh', '--q-phylum', help='Quiet for phylum detection.', action='store_false')
 
 args=parser.parse_args()
 
@@ -87,12 +88,14 @@ if not quiet:
     verboseScan = 0
     verboseDetected = 0
     verbosePreprocess = 0
+    verbosePhylum = 0
 else:
     verboseDownload = args.q_download
     verboseFetch = args.q_fetch
     verboseScan = args.q_scan
     verboseDetected = args.q_detected
     verbosePreprocess = args.q_preprocess
+    verbosePhylum = args.q_phylum
 
 
 
@@ -116,6 +119,7 @@ downloadFetch(verbose=verboseFetch)
 trnaScanSE(verbose=verboseScan)
 findDetectedSeC(verbose=verboseDetected)
 preprocessSeC(verbose=verbosePreprocess)
+phylumDetection(verbose=verbosePhylum)
 
 if referenceRange == None:
     alignMAFFT()

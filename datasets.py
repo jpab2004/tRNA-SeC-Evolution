@@ -46,6 +46,8 @@ createdProcessedFile = False
 globalAlignFile = None
 createdAlignFile = False
 
+globalTRNACount = None
+
 
 
 def printCollection(taxon, numberOfOrganisms, status, popularName=None, summaryRead=None):
@@ -229,7 +231,7 @@ def addToProcessedFile(processedInfos, __processedFile=None):
             header = processedInfos[name]['header']
             sequence = processedInfos[name]['sequence']
 
-            fileHandler.write(f'{header}\n{sequence}\n\n')
+            fileHandler.write(f'{header}\n{sequence}\n')
 
 
 
@@ -985,6 +987,8 @@ def findDetectedSeC(__readyFile=None, __detectedFile=None, verbose=1):
 
 
 def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
+    global globalTRNACount
+
     if __detectedFile == None:
         global globalDetectedFile
         detectedFile = globalDetectedFile
@@ -1055,9 +1059,9 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
                 strand, size, score = headerInfos[2], headerInfos[5], headerInfos[8]
 
                 #f'>{kingdom}.{organismName.replace(" ", "_")}.{tRNANumber} | {kingdom}_{chromosomeState}.{chromosomeNumber}:{chromosomePosition} | {strand}_{size}_{score}'
-                headerFinal = f'>{kingdom}.SeC-{j}.{organismName.replace(".", " ").replace(" ", "_")}'
+                # headerFinal = f'>{kingdom}.SeC-{j}.{organismName.replace(".", " ").replace(" ", "_")}'
                 # headerFinal = f'>{taxId}.SeC-{j}.{organismName.replace(" ", "_")}'
-                # headerFinal = f'>{taxId}.{j}'dsadas
+                headerFinal = f'>{taxId}.{j}'
 
                 # processedInfos[f'{organismName}.{j}'] = {'info': detectedInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
                 processedInfos[f'{organismName}.{j}'] = {'info': detectedInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
@@ -1076,6 +1080,7 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
             print()
 
     addToProcessedFile(processedInfos, __processedFile)
+    globalTRNACount = tRNAs
 
     print(
         f'{tabulation}{magenta("tRNAs-SeC preprocessing ended | ") + numberP(count) + magenta(" genomes processed (") + numberP(tRNAs) + magenta(" tRNAs-SeC) & ") +
@@ -1085,7 +1090,132 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
 
 
 
+def phylumDetection(__readyFile=None, verbose=1):
+    if __readyFile == None:
+        global globalReadyFile
+        readyFile = globalReadyFile
+    else:
+        readyFile = __readyFile
+
+    with open(readyFile, 'r') as fileHandler:
+        readyLines = fileHandler.readlines()
+    
+    readyInfos = {}
+    for info in readyLines:
+        splitted = info.strip('\n').split(' > ')
+        popularName = splitted[3] if splitted[3] != 'None' else None
+
+        readyInfos[splitted[1]] = {
+            'accession': splitted[0],
+            'tax-id': splitted[2],
+            'popular-name': popularName,
+            'chromosomes-folder': splitted[4],
+            'kingdom': splitted[5]
+        }
+
+    count = 0
+    found = 0
+    skipped = 0
+    phylumInfos = {}
+
+    print(f'{tabulation}{magenta(f"Phylum collection starting" + " | " + numberP(len(readyLines)) + magenta(" genomes")):^140}\n')
+    for i, organismName in enumerate(readyInfos, 1):
+        chromosomesFolder = readyInfos[organismName]['chromosomes-folder']
+        popularName = readyInfos[organismName]['popular-name']
+        accession = readyInfos[organismName]['accession']
+        kingdom = readyInfos[organismName]['kingdom']
+        taxId = readyInfos[organismName]['tax-id']
+        name = f'{i}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
+
+        shellPhylumCollected = os.popen(f'if [ -e {globalGenomesPath}/{accession}/phylum.status ]; then echo "1"; else echo "0"; fi;')
+        if int(shellPhylumCollected.read()):
+            shellPhylum = os.popen(f'cat {globalGenomesPath}/{accession}/phylum.status')
+            shellPhylumRead = shellPhylum.read().strip('\n')
+            shellPhylum.close()
+
+            phylum, phylumId = shellPhylumRead.split(' > ')
+
+            phylumInfos[organismName] = readyInfos[organismName]
+            phylumInfos[organismName]['phylum'] = phylum
+            phylumInfos[organismName]['phylum-id'] = phylumId
+
+            found += 1
+
+            if verbose:
+                print(f'{tabulation}{yellow(name)}:')
+                ps(green('Already passed collection'))
+                pe(magenta('Skipping organism'))
+                print()
+
+            continue
+
+        if (verbose):            
+            print(f'{tabulation}{yellow(name)}:')
+
+        try:
+            os.chdir(chromosomesFolder + '/..')
+            if verbose:
+                ps(green('Download folder found'))
+                pe(cyan('Attempting collection'))
+        except:
+            if verbose:
+                ps(red('Could not find download folder!'))
+                pe(cyan('Skipping organism'))
+                print()
+
+            skipped += 1
+            continue
+
+        try:
+            shellPhylum = os.popen(f'datasets summary taxonomy taxon {taxId} --as-json-lines')
+            summaryRead = shellPhylum.read().replace('true', "'true'")[:-1]
+            shellPhylum.close()
+
+            summary = {}
+            for j, summa in enumerate(summaryRead.split('\n')):
+                try:
+                    summary[j] = ast.literal_eval(summa)
+                except Exception as e:
+                    print(j, summa, e)
+                    sys.exit()
+
+            phylumSummary = summary[0]['taxonomy']['classification']['phylum']
+            phylum, phylumId = phylumSummary['name'], phylumSummary['id']
+
+            phylumInfos[organismName] = readyInfos[organismName]
+            phylumInfos[organismName]['phylum'] = phylum
+            phylumInfos[organismName]['phylum-id'] = phylumId
+
+            shellCreatePhylum = os.popen(f'echo "{phylum} > {phylumId}" > phylum.status')
+            _ = shellCreatePhylum.read()
+            shellCreatePhylum.close()
+
+            count += 1
+            if verbose:
+                pprint(green('Phylum collected!'))
+                print()
+        except KeyboardInterrupt:
+            shellPhylum.close()
+            shellCreatePhylum.close()
+            sys.exit()
+        except Exception as e:
+            shellPhylum.close()
+            shellCreatePhylum.close()
+            print(tabulation + red('ERROR:') + str(e))
+            sys.exit()
+
+    pretty(phylumInfos)
+
+    print(
+        f'{tabulation}{magenta("Phylum collection starting | ") + numberP(count) + magenta(" genomes processed & ") + numberP(skipped) + magenta(" skipped"):^145}'
+    )
+    separator()
+
+
+
 def alignMAFFT(__processedFile=None, __alignFile=None, progress=0):
+    global globalTRNACount
+
     if __processedFile == None:
         global globalProcessedFile
         processedFile = globalProcessedFile
@@ -1097,11 +1227,8 @@ def alignMAFFT(__processedFile=None, __alignFile=None, progress=0):
         alignFile = globalAlignFile
     else:
         alignFile = __alignFile
-    
-    with open(globalDetectedFile, 'r') as fileHandler:
-        numberGenomes = len(fileHandler.readlines())
 
-    print(f'{tabulation}{magenta(f"MAFFT alignment starting" + " | " + numberP(numberGenomes) + magenta(" genomes")):^140}\n')
+    print(f'{tabulation}{magenta(f"MAFFT alignment starting" + " | " + numberP(globalTRNACount) + magenta(" tRNAs-SeC")):^140}\n')
     try:
         args = '--auto --reorder'
         if not progress:
