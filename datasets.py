@@ -46,6 +46,9 @@ createdProcessedFile = False
 globalAlignFile = None
 createdAlignFile = False
 
+globalPhylumFile = None
+createdPhylumFile = False
+
 globalTRNACount = None
 
 
@@ -82,9 +85,11 @@ def checkPath(path, returnPath=False):
     if returnPath:
         return path
 
-def pathCheckCreation(path, returnPath=False):
-    if not os.path.isdir(path):
-        os.mkdir(path)
+def pathCheckCreation(path, returnPath=False, create=True):
+    if create:
+        if not os.path.isdir(path):
+            os.mkdir(path)
+    
     os.chdir(path)
 
     if returnPath:
@@ -94,43 +99,43 @@ def pathCheckCreation(path, returnPath=False):
 
 
 # Creation of the Genomes path
-def createGenomesPath(__genomesPath='Genomes/'):
+def createGenomesPath(__genomesPath='Genomes/', suppress=False):
     global globalGenomesPath, createdGenomesPath
 
     __path = os.getcwd()
-    __path = pathCheckCreation(__path + '/' + __genomesPath, returnPath=True)
+    __path = pathCheckCreation(__path + '/' + __genomesPath, returnPath=True, create=not suppress)
     createdGenomesPath = True
 
     globalGenomesPath = __path
 
-def createFetchFile(__fetchFile='fetch'):
+def createFetchFile(__fetchFile='fetch', suppress=False):
     global globalFetchFile, createdFetchFile
     
-    os.system(f'> {__fetchFile}.data')
+    if not suppress: os.system(f'> {__fetchFile}.data')
     createdFetchFile = True
 
     globalFetchFile = os.popen(f'readlink -f {__fetchFile}.data').read()[:-1]
 
-def createReadyFile(__readyFile='ready'):
+def createReadyFile(__readyFile='ready', suppress=False):
     global globalReadyFile, createdReadyFile
     
-    os.system(f'> {__readyFile}.data')
+    if not suppress: os.system(f'> {__readyFile}.data')
     createdReadyFile = True
 
     globalReadyFile = os.popen(f'readlink -f {__readyFile}.data').read()[:-1]
 
-def createDetectedFile(__detectedFile='detected'):
+def createDetectedFile(__detectedFile='detected', suppress=False):
     global globalDetectedFile, createdDetectedFile
     
-    os.system(f'> {__detectedFile}.data')
+    if not suppress: os.system(f'> {__detectedFile}.data')
     createdDetectedFile = True
 
     globalDetectedFile = os.popen(f'readlink -f {__detectedFile}.data').read()[:-1]
 
-def createProcessedFile(__processedFile='processed'):
+def createProcessedFile(__processedFile='processed', suppress=False):
     global globalProcessedFile, createdProcessedFile
     
-    os.system(f'> {__processedFile}.fna')
+    if not suppress: os.system(f'> {__processedFile}.fna')
     createdProcessedFile = True
 
     globalProcessedFile = os.popen(f'readlink -f {__processedFile}.fna').read()[:-1]
@@ -143,13 +148,36 @@ def createAlignFile(__alignFile='align'):
 
     globalAlignFile = os.popen(f'readlink -f {__alignFile}.fasta').read()[:-1]
 
-def initiate(__genomesPath='Genomes/', __fetchFile='fetch', __readyFile='ready', __detectedFile='detected', __processedFile='processed', __alignFile='align'):
-    createGenomesPath(__genomesPath)
-    createFetchFile(__fetchFile)
-    createReadyFile(__readyFile)
-    createDetectedFile(__detectedFile)
-    createProcessedFile(__processedFile)
+def createPhylumFile(__phylumFile='phylum', suppress=False):
+    global globalPhylumFile, createdPhylumFile
+    
+    if not suppress: os.system(f'> {__phylumFile}.data')
+    createdPhylumFile = True
+
+    globalPhylumFile = os.popen(f'readlink -f {__phylumFile}.data').read()[:-1]
+
+def initiate(
+        __genomesPath='Genomes/',
+        __fetchFile='fetch',
+        __readyFile='ready',
+        __detectedFile='detected',
+        __processedFile='processed',
+        __alignFile='align',
+        __phylumFile='phylum',
+        
+        suppressDownload=False,
+        suppressFetch=False,
+        suppressDetected=False,
+        suppressPreprocess=False,
+        suppressPhylum=False
+    ):
+    createGenomesPath(__genomesPath, suppress=suppressDownload)
+    createFetchFile(__fetchFile, suppress=suppressFetch)
+    createReadyFile(__readyFile, suppress=(suppressDownload and suppressFetch))
+    createDetectedFile(__detectedFile, suppress=suppressDetected)
+    createProcessedFile(__processedFile, suppress=suppressPreprocess)
     createAlignFile(__alignFile)
+    createPhylumFile(__phylumFile, suppress=suppressPhylum)
 
     return
 
@@ -233,6 +261,28 @@ def addToProcessedFile(processedInfos, __processedFile=None):
 
             fileHandler.write(f'{header}\n{sequence}\n')
 
+def addToPhylumFile(phylumInfos, __phylumFile=None):
+    if __phylumFile == None:
+        global globalPhylumFile
+        phylumFile = globalPhylumFile
+    else:
+        phylumFile = __phylumFile
+
+    if not createdPhylumFile:
+        createPhylumFile()
+
+    with open(phylumFile, 'a') as fileHandler:
+        for name in phylumInfos:
+            accession = phylumInfos[name]['accession']
+            taxId = phylumInfos[name]['tax-id']
+            chromosomesFolderPath = phylumInfos[name]['chromosomes-folder'].strip('\n')
+            popularName = phylumInfos[name]['popular-name']
+            kingdom = phylumInfos[name]['kingdom']
+            phylum = phylumInfos[name]['phylum']
+            phylumId = phylumInfos[name]['phylum-id']
+
+            fileHandler.write(f'{accession} > {name} > {taxId} > {popularName} > {chromosomesFolderPath} > {kingdom} > {phylum} > {phylumId}\n')
+
 
 
 # Printing dictionaries
@@ -248,7 +298,7 @@ def pretty(value, sort_keys=True, indent=4, colorOrder=[green, blue, red, cyan, 
             color.rotate(depth-1)
             pcolor = color[0]
             color.rotate(- (depth-1))
-            print(pcolor(packet))
+            pprint(pcolor(packet[4:]))
 
 
 
@@ -259,12 +309,14 @@ def collectInfo(taxons, verbose=1, debug=0, archaea=0):
 
     separator()
     print(f'{tabulation}{magenta("Data collection starting"):^120}\n')
+    totalIndexing = len(list(taxons.keys()))
+    indexingSize = len(str(totalIndexing))
     for i, (taxon, (popularName, kingdom)) in enumerate(sorted(taxons.items()), 1):
         command = f'datasets summary genome taxon "{taxon}"'
         command += f' --reference --assembly-source RefSeq --as-json-lines 2>&1' if (not archaea) else ' --assembly-source RefSeq --as-json-lines 2>&1'
         shell = os.popen(command)
         summaryRead = shell.read().replace('true', "'true'")[:-1]
-        name = f'{i}. {taxon}'
+        name = f'{i:<{indexingSize}}/{totalIndexing}. {taxon}'
         shell.close()
 
         if 'but no genome data is currently available for this taxon' in summaryRead:
@@ -364,13 +416,15 @@ def downloadGenomes(
         organismsNamesSorted = list(organisms.keys())[range1:range2]
 
     print(f'{tabulation}{magenta("Genomes download starting"):^120}\n')
+    totalIndexing = len(organismsNamesSorted)
+    indexingSize = len(str(totalIndexing))
     for i, organismName in enumerate(organismsNamesSorted, 1):
         organism = organisms[organismName]
         accession = organism['accession']
         size, unit = organism['filesize-unit']
         popularName = organism['popular-name']
         kingdom = organism['kingdom']
-        name = f'{i}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
+        name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
         arguments = ''
 
         shellRecycled = os.popen(f'if [ -e {genomesPath}/{accession}/recycled.status ]; then echo "1"; else echo "0"; fi;')
@@ -588,13 +642,15 @@ def downloadFetch(__fetchFile=None, __readyFile=None, verbose=1, progressbar=0):
     found = 0
     skipped = 0
     print(f'{tabulation}{magenta(f"Genomes rehydration starting"):^120}\n')
+    totalIndexing = len(list(fetchInfos.keys()))
+    indexingSize = len(str(totalIndexing))
     for i, organismName in enumerate(fetchInfos, 1):
         fetchFolder = fetchInfos[organismName]['fetch-folder']
         chromosomesFolder = fetchInfos[organismName]['chromosomes-folder']
         popularName = fetchInfos[organismName]['popular-name']
         accession = fetchInfos[organismName]['accession']
         kingdom = fetchInfos[organismName]['kingdom']
-        name = f'{i}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
+        name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
         arguments = ' --directory . --max-workers 30'
 
         shellRehydrated = os.popen(f'if [ -e {globalGenomesPath}/{accession}/rehydrated.status ]; then echo "1"; else echo "0"; fi;')
@@ -716,12 +772,14 @@ def trnaScanSE(__readyFile=None, verbose=1, recycle=1):
     found = 0
     skipped = 0
     print(f'{tabulation}{magenta(f"tRNAscan-SE analysis starting" + " | " + numberP(len(readyLines)) + magenta(" genomes")):^140}\n')
+    totalIndexing = len(list(readyInfos.keys()))
+    indexingSize = len(str(totalIndexing))
     for i, organismName in enumerate(readyInfos, 1):
         chromosomesFolder = readyInfos[organismName]['chromosomes-folder']
         popularName = readyInfos[organismName]['popular-name']
         accession = readyInfos[organismName]['accession']
         kingdom = readyInfos[organismName]['kingdom']
-        name = f'{i}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
+        name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
 
         shellAnalysed = os.popen(f'if [ -e {globalGenomesPath}/{accession}/analysed.status ]; then echo "1"; else echo "0"; fi;')
         shellRecycled = os.popen(f'if [ -e {globalGenomesPath}/{accession}/recycled.status ]; then echo "1"; else echo "0"; fi;')
@@ -732,7 +790,7 @@ def trnaScanSE(__readyFile=None, verbose=1, recycle=1):
         if int(shellAnalysed.read()):
             found += 1
             if verbose:
-                ps(green('Already analysed'))
+                ps(red('Already analysed'))
                 pe(magenta('Skipping organism'))
                 print()
             continue
@@ -762,7 +820,7 @@ def trnaScanSE(__readyFile=None, verbose=1, recycle=1):
                 shellChromosomeAnalysed = os.popen(f'if [ -e {chromosomesFolder}/{fileToAnalyse[:-4]}.hits ]; then echo "1"; else echo "0"; fi;')
                 if int(shellChromosomeAnalysed.read()):
                     if verbose:
-                        pm(green('Already analysed'))
+                        pm(red('Already analysed'))
 
                     if recycle:
                         shellRecycled = os.popen(f'if [ -e {globalGenomesPath}/{accession}/recycled.status ]; then echo "1"; else echo "0"; fi;')
@@ -894,12 +952,14 @@ def findDetectedSeC(__readyFile=None, __detectedFile=None, verbose=1):
     detectedInfos = {}
 
     print(f'{tabulation}{magenta(f"Detected tRNAs-SeC analysis starting" + " | " + numberP(len(readyLines)) + magenta(" genomes")):^140}\n')
+    totalIndexing = len(list(readyInfos.keys()))
+    indexingSize = len(str(totalIndexing))
     for i, organismName in enumerate(readyInfos, 1):
         chromosomesFolder = readyInfos[organismName]['chromosomes-folder']
         popularName = readyInfos[organismName]['popular-name']
         accession = readyInfos[organismName]['accession']
         kingdom = readyInfos[organismName]['kingdom']
-        name = f'{i}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
+        name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
 
         shellAlreadyDetectedPlus = os.popen(f'if [ -e {globalGenomesPath}/{accession}/detected+.status ]; then echo "1"; else echo "0"; fi;')
         shellAlreadyDetectedMinus = os.popen(f'if [ -e {globalGenomesPath}/{accession}/detected-.status ]; then echo "1"; else echo "0"; fi;')
@@ -909,7 +969,7 @@ def findDetectedSeC(__readyFile=None, __detectedFile=None, verbose=1):
 
             if verbose:
                 print(f'{tabulation}{yellow(name)}:')
-                ps(green('Already passed detection'))
+                ps(red('Already passed detection'))
                 pe(magenta('Skipping organism'))
                 print()
 
@@ -919,7 +979,7 @@ def findDetectedSeC(__readyFile=None, __detectedFile=None, verbose=1):
 
             if verbose:
                 print(f'{tabulation}{yellow(name)}:')
-                ps(green('Already detected'))
+                ps(red('Already detected'))
                 pe(magenta('Skipping organism'))
                 print()
 
@@ -1017,13 +1077,15 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
     processedInfos = {}
 
     print(f'{tabulation}{magenta(f"Preprocessing tRNAs-SeC starting" + " | " + numberP(len(detectedLines)) + magenta(" genomes")):^140}\n')
+    totalIndexing = len(list(detectedInfos.keys()))
+    indexingSize = len(str(totalIndexing))
     for i, organismName in enumerate(detectedInfos, 1):
         chromosomesFolder = detectedInfos[organismName]['chromosomes-folder']
         popularName = detectedInfos[organismName]['popular-name']
         accession = detectedInfos[organismName]['accession']
         kingdom = detectedInfos[organismName]['kingdom']
         taxId = detectedInfos[organismName]['tax-id']
-        name = f'{i}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
+        name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
 
         if (verbose):            
             print(f'{tabulation}{yellow(name)}:')
@@ -1076,7 +1138,7 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
             sys.exit()
 
         if verbose:
-            print(f'{tabulation}{green("Processing finished")}')
+            print(f'{tabulation}{red("Processing finished")}')
             print()
 
     addToProcessedFile(processedInfos, __processedFile)
@@ -1090,7 +1152,7 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
 
 
 
-def phylumDetection(__readyFile=None, verbose=1):
+def phylumDetection(__readyFile=None, __phylumFile=None, verbose=1):
     if __readyFile == None:
         global globalReadyFile
         readyFile = globalReadyFile
@@ -1119,13 +1181,15 @@ def phylumDetection(__readyFile=None, verbose=1):
     phylumInfos = {}
 
     print(f'{tabulation}{magenta(f"Phylum collection starting" + " | " + numberP(len(readyLines)) + magenta(" genomes")):^140}\n')
+    totalIndexing = len(list(readyInfos.keys()))
+    indexingSize = len(str(totalIndexing))
     for i, organismName in enumerate(readyInfos, 1):
         chromosomesFolder = readyInfos[organismName]['chromosomes-folder']
         popularName = readyInfos[organismName]['popular-name']
         accession = readyInfos[organismName]['accession']
         kingdom = readyInfos[organismName]['kingdom']
         taxId = readyInfos[organismName]['tax-id']
-        name = f'{i}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
+        name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
 
         shellPhylumCollected = os.popen(f'if [ -e {globalGenomesPath}/{accession}/phylum.status ]; then echo "1"; else echo "0"; fi;')
         if int(shellPhylumCollected.read()):
@@ -1143,7 +1207,7 @@ def phylumDetection(__readyFile=None, verbose=1):
 
             if verbose:
                 print(f'{tabulation}{yellow(name)}:')
-                ps(green('Already passed collection'))
+                ps(red('Already passed collection'))
                 pe(magenta('Skipping organism'))
                 print()
 
@@ -1192,7 +1256,7 @@ def phylumDetection(__readyFile=None, verbose=1):
 
             count += 1
             if verbose:
-                pprint(green('Phylum collected!'))
+                pprint(red('Phylum collected!'))
                 print()
         except KeyboardInterrupt:
             shellPhylum.close()
@@ -1204,10 +1268,118 @@ def phylumDetection(__readyFile=None, verbose=1):
             print(tabulation + red('ERROR:') + str(e))
             sys.exit()
 
-    pretty(phylumInfos)
+    addToPhylumFile(phylumInfos, __phylumFile)
 
     print(
-        f'{tabulation}{magenta("Phylum collection starting | ") + numberP(count) + magenta(" genomes processed & ") + numberP(skipped) + magenta(" skipped"):^145}'
+        f'{tabulation}{magenta("Phylum collection finished | ") + numberP(count) + magenta(" genomes processed, ") + numberP(found) + magenta(" found & ")
+        + numberP(skipped) + magenta(" skipped"):^175}'
+    )
+    separator()
+
+
+
+def phylumAnalysis(__phylumFile=None, __detectedFile=None, verbose=1, debug=0):
+    if __phylumFile == None:
+        global globalPhylumFile
+        phylumFile = globalPhylumFile
+    else:
+        phylumFile = __phylumFile
+
+    if __detectedFile == None:
+        global globalDetectedFile
+        detectedFile = globalDetectedFile
+    else:
+        detectedFile = __detectedFile
+
+    with open(phylumFile, 'r') as fileHandler:
+        phylumLines = fileHandler.readlines()
+
+    with open(detectedFile, 'r') as fileHandler:
+        detectedLines = fileHandler.readlines()
+    
+    phylumInfos = {}
+    for info in phylumLines:
+        splitted = info.strip('\n').split(' > ')
+        popularName = splitted[3] if splitted[3] != 'None' else None
+
+        phylumInfos[splitted[1]] = {
+            'accession': splitted[0],
+            'tax-id': splitted[2],
+            'popular-name': popularName,
+            'chromosomes-folder': splitted[4],
+            'kingdom': splitted[5],
+            'phylum': splitted[6],
+            'phylum-id': splitted[7]
+        }
+
+    detectedInfos = {}
+    for info in detectedLines:
+        splitted = info.strip('\n').split(' > ')
+        popularName = splitted[3] if splitted[3] != 'None' else None
+
+        detectedInfos[splitted[1]] = {
+            'accession': splitted[0],
+            'tax-id': splitted[2],
+            'popular-name': popularName,
+            'chromosomes-folder': splitted[4],
+            'kingdom': splitted[5],
+        }
+    
+    phylumAnalysis = defaultdict(lambda: {'total': 0, 'found': 0, 'percentage': None})
+    phylumAnalysis['total'] = 0
+    phylumAnalysis['found'] = 0
+    phylumAnalysis['percentage'] = None
+
+    print(f'{tabulation}{magenta(f"Phylum analysis starting" + " | " + numberP(len(phylumLines)) + magenta(" genomes")):^140}\n')
+    totalIndexing = len(list(phylumInfos.keys()))
+    indexingSize = len(str(totalIndexing))
+    for i, organismName in enumerate(phylumInfos, 1):
+        chromosomesFolder = phylumInfos[organismName]['chromosomes-folder']
+        popularName = phylumInfos[organismName]['popular-name']
+        accession = phylumInfos[organismName]['accession']
+        kingdom = phylumInfos[organismName]['kingdom']
+        taxId = phylumInfos[organismName]['tax-id']
+        phylum = phylumInfos[organismName]['phylum']
+        phylumId = phylumInfos[organismName]['phylum-id']
+        name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
+
+        if (verbose):            
+            pprint(yellow(name) + ':')
+            ps(magenta(phylum))
+
+        phylumAnalysis['total'] += 1
+        phylumAnalysis[phylum]['total'] += 1
+        if organismName in detectedInfos:
+            phylumAnalysis['found'] += 1
+            phylumAnalysis[phylum]['found'] += 1
+            if verbose:
+                pm(green('Found!'))
+
+        if verbose:
+            pe(red('Acounted!'))
+            print()
+
+    for phy in phylumAnalysis:
+        if phy in ['found', 'total', 'percentage']:
+            continue
+
+        found = phylumAnalysis[phy]['found']
+        total = phylumAnalysis[phy]['total']
+        percentage = f'{100 * (found / total):.2f}%'
+        phylumAnalysis[phy]['percentage'] = percentage
+
+    found = phylumAnalysis['found']
+    total = phylumAnalysis['total']
+    percentage = f'{100 * (found / total):.2f}%'
+    phylumAnalysis['percentage'] = percentage
+
+    if debug:
+        pretty(phylumAnalysis)
+        if verbose:
+            print()
+
+    print(
+        f'{tabulation}{magenta("Phylum analysis finished"):^120}'
     )
     separator()
 
