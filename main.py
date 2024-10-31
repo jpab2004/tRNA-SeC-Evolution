@@ -1,4 +1,4 @@
-from datasets import collectInfo, downloadGenomes, downloadFetch, trnaScanSE, findDetectedSeC, preprocessSeC, alignMAFFT, phylumDetection, phylumAnalysis
+from datasets import collectInfo, downloadGenomes, downloadFetch, trnaScanSE, findDetectedSeC, preprocessSeC, alignMAFFT, taxonDetection, taxonAnalysis
 from datasets import initiate, pretty
 import os, argparse, sys
 
@@ -8,7 +8,7 @@ os.system('clear')
 
 
 
-__taxons = {
+__taxonNames = {
     # # Bacteria
     # 'Pseudomonas fluorescens': (None, 'B'),
     # 'Mycoplasmoides pneumoniae': ('Pneumonia', 'B'),
@@ -49,9 +49,9 @@ parser.add_argument('--ready-file', help='The name for the default ready file in
 parser.add_argument('--detected-file', help='The name for the default detected file information.')
 parser.add_argument('--processed-file', help='The name for the default processed file information.')
 parser.add_argument('--align-file', help='The name for the default alignment file.')
-parser.add_argument('--phylum-file', help='The name for the default phylum file.')
+parser.add_argument('--taxon-file', help='The name for the default taxon file.')
 
-parser.add_argument('--taxon', help='The name for the taxon to be analysed.')
+parser.add_argument('--taxonNames', help='The names of the taxons to be analysed.')
 parser.add_argument('--reference-range', help='Range of organisms in the taxon to be analysed.')
 parser.add_argument('--range-step', help='The step of the range.')
 
@@ -64,16 +64,16 @@ parser.add_argument('-QF', '--q-fetch', help='Quiet for fetch.', action='store_f
 parser.add_argument('-QS', '--q-scan', help='Quiet for scan.', action='store_false')
 parser.add_argument('-QDe', '--q-detected', help='Quiet for detected tRNAs-SeC.', action='store_false')
 parser.add_argument('-QP', '--q-preprocess', help='Quiet for preprocess tRNAs-SeC.', action='store_false')
-parser.add_argument('-QPh', '--q-phylum', help='Quiet for phylum detection.', action='store_false')
-parser.add_argument('-QPA', '--q-phyana', help='Quiet for phylum analysis.', action='store_false')
+parser.add_argument('-QPh', '--q-taxon', help='Quiet for taxon detection.', action='store_false')
+parser.add_argument('-QPA', '--q-taxana', help='Quiet for taxon analysis.', action='store_false')
 
 parser.add_argument('-SD', '--suppress-download', help='Suppress download process.', action='store_false')
 parser.add_argument('-SF', '--suppress-fetch', help='Suppress fetch process.', action='store_false')
 parser.add_argument('-SS', '--suppress-scan', help='Suppress scan process.', action='store_false')
 parser.add_argument('-SDe', '--suppress-detected', help='Suppress detected process.', action='store_false')
 parser.add_argument('-SP', '--suppress-preprocess', help='Suppress preprocess.', action='store_false')
-parser.add_argument('-SPh', '--suppress-phylum', help='Suppress phylum process.', action='store_false')
-parser.add_argument('-SPA', '--suppress-phyana', help='Suppress phylum analysis process.', action='store_false')
+parser.add_argument('-SPh', '--suppress-taxon', help='Suppress taxon process.', action='store_false')
+parser.add_argument('-SPA', '--suppress-taxana', help='Suppress taxon analysis process.', action='store_false')
 
 args=parser.parse_args()
 
@@ -85,9 +85,9 @@ readyFile = args.ready_file if args.ready_file != None else 'ready'
 detectedFile = args.detected_file if args.detected_file != None else 'detected'
 processedFile = args.processed_file if args.processed_file != None else 'processed'
 alignFile = args.align_file if args.align_file != None else 'align'
-phylumFile = args.phylum_file if args.phylum_file != None else 'phylum'
+taxonFile = args.taxon_file if args.taxon_file != None else 'phylum'
 
-taxons = eval(args.taxon) if args.taxon != None else __taxons
+taxonNames = eval(args.taxonNames) if args.taxonNames != None else __taxonNames
 referenceRange = int(args.reference_range) if args.reference_range != None else None
 rangeStep = int(args.range_step) if args.range_step != None else 1
 
@@ -101,24 +101,24 @@ if not quiet:
     verboseScan = 0
     verboseDetected = 0
     verbosePreprocess = 0
-    verbosePhylum = 0
-    verbosePhylumAnalysis = 0
+    verboseTaxon = 0
+    verboseTaxonAnalysis = 0
 else:
     verboseDownload = args.q_download
     verboseFetch = args.q_fetch
     verboseScan = args.q_scan
     verboseDetected = args.q_detected
     verbosePreprocess = args.q_preprocess
-    verbosePhylum = args.q_phylum
-    verbosePhylumAnalysis = args.q_phyana
+    verboseTaxon = args.q_taxon
+    verboseTaxonAnalysis = args.q_taxana
 
 suppressDownload = args.suppress_download
 suppressFetch = args.suppress_fetch
 suppressScan = args.suppress_scan
 suppressDetected = args.suppress_detected
 suppressPreprocess = args.suppress_preprocess
-suppressPhylum = args.suppress_phylum
-suppressPhylumAnalysis = args.suppress_phyana
+suppressTaxon = args.suppress_taxon
+suppressTaxonAnalysis = args.suppress_taxana
 
 
 
@@ -133,25 +133,25 @@ files = {
     '__detectedFile': detectedFile + suffix,
     '__processedFile': processedFile + suffix,
     '__alignFile': alignFile,
-    '__phylumFile': phylumFile,
+    '__taxonFile': taxonFile,
 
     'suppressDownload': not suppressDownload,
     'suppressFetch': not suppressFetch,
     'suppressDetected': not suppressDetected,
     'suppressPreprocess': not suppressPreprocess,
-    'suppressPhylum': not suppressPhylum
+    'suppressTaxon': not suppressTaxon
 }
 initiate(**files)
 
-species = collectInfo(taxons, archaea=refseq)
+species = collectInfo(taxonNames, archaea=refseq)
 
 if suppressDownload: downloadGenomes(species, sizeLimit=20, referenceRange=referenceRange, rangeStep=rangeStep, reDownload=reDownload, verbose=verboseDownload)
 if suppressFetch: downloadFetch(verbose=verboseFetch)
 if suppressScan: trnaScanSE(verbose=verboseScan)
 if suppressDetected: findDetectedSeC(verbose=verboseDetected)
 if suppressPreprocess: preprocessSeC(verbose=verbosePreprocess)
-if suppressPhylum: phylumDetection(verbose=verbosePhylum)
-if suppressPhylumAnalysis: phylumAnalysis(verbose=verbosePhylumAnalysis, debug=1)
+if suppressTaxon: taxonDetection(verbose=verboseTaxon)
+if suppressTaxonAnalysis: taxonAnalysis(verbose=verboseTaxonAnalysis, debug=1)
 
 if referenceRange == None:
     alignMAFFT()
