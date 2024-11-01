@@ -1096,9 +1096,8 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
         chromosomesFolder = detectedInfos[organismName]['chromosomes-folder']
         popularName = detectedInfos[organismName]['popular-name']
         accession = detectedInfos[organismName]['accession']
-        kingdom = detectedInfos[organismName]['kingdom']
         taxId = detectedInfos[organismName]['tax-id']
-        name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
+        name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + cyan(f' ({popularName} - {accession}/{taxId})' if popularName != None else f' ({accession}/{taxId})')
 
         if (verbose):            
             print(f'{tabulation}{yellow(name)}:')
@@ -1203,7 +1202,7 @@ def taxonCollection(__readyFile=None, __taxonFile=None, verbose=1):
         popularName = readyInfos[organismName]['popular-name']
         accession = readyInfos[organismName]['accession']
         taxId = readyInfos[organismName]['tax-id']
-        name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
+        name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + cyan(f' ({popularName} - {accession}/{taxId})' if popularName != None else f' ({accession}/{taxId})')
 
         shellTaxonCollected = os.popen(f'if [ -e {globalGenomesPath}/{accession}/taxonomy.status ]; then echo "1"; else echo "0"; fi;')
         if int(shellTaxonCollected.read()):
@@ -1248,7 +1247,7 @@ def taxonCollection(__readyFile=None, __taxonFile=None, verbose=1):
 
         try:
             created = 0
-            shellTaxon = os.popen(f'datasets summary taxonomy taxon {taxId} --as-json-lines')
+            shellTaxon = os.popen(f'datasets summary taxonomy taxon "{taxId}" --as-json-lines')
 
             summaryRead = shellTaxon.read().replace('true', "'true'")[:-1]
             shellTaxon.close()
@@ -1284,7 +1283,7 @@ def taxonCollection(__readyFile=None, __taxonFile=None, verbose=1):
                 taxonInfos[organismName]['taxonomy'] = {}
                 taxonInfos[organismName]['taxonomy'][level] = taxon
                 taxonInfos[organismName]['taxonomy'][f'{level}-id'] = taxonId
-                commandParts.append(f'{level}:{taxon}:{taxonId}')
+                commandParts.append(f'{level}<{taxon}<{taxonId}')
 
                 if verbose:
                     pe(green('Collected'))
@@ -1399,8 +1398,9 @@ def taxonAnalysis(__level='all', __taxonFile=None, __detectedFile=None, verbose=
         foundTxt = green('Found') if found else red('Not found')
         popularName = taxonInfos[organismName]['popular-name']
         accession = taxonInfos[organismName]['accession']
+        taxId = taxonInfos[organismName]['tax-id']
 
-        namePart = cyan(f' ({popularName} - {accession}) {foundTxt}' if popularName != None else f' ({accession}) {foundTxt}')
+        namePart = cyan(f' ({popularName} - {accession}/{taxId}) {foundTxt}' if popularName != None else f' ({accession}/{taxId}) {foundTxt}')
         name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + namePart
 
         if (verbose):            
