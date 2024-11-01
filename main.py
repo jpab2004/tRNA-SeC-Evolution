@@ -1,4 +1,4 @@
-from datasets import collectInfo, downloadGenomes, downloadFetch, trnaScanSE, findDetectedSeC, preprocessSeC, alignMAFFT, taxonDetection, taxonAnalysis
+from datasets import collectInfo, downloadGenomes, downloadFetch, trnaScanSE, findDetectedSeC, preprocessSeC, alignMAFFT, taxonCollection, taxonAnalysis
 from datasets import initiate, pretty
 import os, argparse, sys
 
@@ -51,7 +51,8 @@ parser.add_argument('--processed-file', help='The name for the default processed
 parser.add_argument('--align-file', help='The name for the default alignment file.')
 parser.add_argument('--taxon-file', help='The name for the default taxon file.')
 
-parser.add_argument('--taxonNames', help='The names of the taxons to be analysed.')
+parser.add_argument('--taxon-names', help='The names of the taxons to be analysed.')
+parser.add_argument('--taxon-level', help='The level of the taxon to be analysed.')
 parser.add_argument('--reference-range', help='Range of organisms in the taxon to be analysed.')
 parser.add_argument('--range-step', help='The step of the range.')
 
@@ -85,9 +86,10 @@ readyFile = args.ready_file if args.ready_file != None else 'ready'
 detectedFile = args.detected_file if args.detected_file != None else 'detected'
 processedFile = args.processed_file if args.processed_file != None else 'processed'
 alignFile = args.align_file if args.align_file != None else 'align'
-taxonFile = args.taxon_file if args.taxon_file != None else 'phylum'
+taxonFile = args.taxon_file if args.taxon_file != None else 'taxonomy'
 
-taxonNames = eval(args.taxonNames) if args.taxonNames != None else __taxonNames
+taxonNames = eval(args.taxon_names) if args.taxon_names != None else __taxonNames
+taxonLevel = args.taxon_level if args.taxon_level != None else 'all'
 referenceRange = int(args.reference_range) if args.reference_range != None else None
 rangeStep = int(args.range_step) if args.range_step != None else 1
 
@@ -150,8 +152,8 @@ if suppressFetch: downloadFetch(verbose=verboseFetch)
 if suppressScan: trnaScanSE(verbose=verboseScan)
 if suppressDetected: findDetectedSeC(verbose=verboseDetected)
 if suppressPreprocess: preprocessSeC(verbose=verbosePreprocess)
-if suppressTaxon: taxonDetection(verbose=verboseTaxon)
-if suppressTaxonAnalysis: taxonAnalysis(verbose=verboseTaxonAnalysis, debug=1)
+if suppressTaxon: taxonCollection(verbose=verboseTaxon)
+if suppressTaxonAnalysis: taxonAnalysis(taxonLevel, verbose=verboseTaxonAnalysis, debug=1)
 
 if referenceRange == None:
     alignMAFFT()

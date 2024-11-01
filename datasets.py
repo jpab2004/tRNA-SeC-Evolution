@@ -27,6 +27,11 @@ pe = lambda x: print(x)
 psT = lambda x: print(f'{tabulation}{x}: ', end='', flush=True)
 peT = lambda x: print(x)
 
+psTaxa = lambda: print(tabulation, end='', flush=True)
+pmTaxa = lambda x: print(f'{x} -> ', end='', flush=True)
+
+
+
 # Consts
 globalGenomesPath = None
 createdGenomesPath = False
@@ -50,6 +55,8 @@ globalTaxonFile = None
 createdTaxonFile = False
 
 globalTRNACount = None
+
+globalTaxonLevels = ['superkingdom', 'kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']
 
 
 
@@ -148,7 +155,7 @@ def createAlignFile(__alignFile='align'):
 
     globalAlignFile = os.popen(f'readlink -f {__alignFile}.fasta').read()[:-1]
 
-def createTaxonFile(__taxonFile='phylum', suppress=False):
+def createTaxonFile(__taxonFile='taxonomy', suppress=False):
     global globalTaxonFile, createdTaxonFile
     
     if not suppress: os.system(f'> {__taxonFile}.data')
@@ -163,7 +170,7 @@ def initiate(
         __detectedFile='detected',
         __processedFile='processed',
         __alignFile='align',
-        __taxonFile='phylum',
+        __taxonFile='taxonomy',
         
         suppressDownload=False,
         suppressFetch=False,
@@ -261,7 +268,9 @@ def addToProcessedFile(processedInfos, __processedFile=None):
 
             fileHandler.write(f'{header}\n{sequence}\n')
 
-def addToTaxonFile(level, taxonInfos, __taxonFile=None):
+def addToTaxonomyFile(taxonInfos, __taxonFile=None):
+    global globalTaxonLevels
+
     if __taxonFile == None:
         global globalTaxonFile
         taxonFile = globalTaxonFile
@@ -277,11 +286,15 @@ def addToTaxonFile(level, taxonInfos, __taxonFile=None):
             taxId = taxonInfos[name]['tax-id']
             chromosomesFolderPath = taxonInfos[name]['chromosomes-folder'].strip('\n')
             popularName = taxonInfos[name]['popular-name']
-            kingdom = taxonInfos[name]['kingdom']
-            taxon = taxonInfos[name][level]
-            taxonId = taxonInfos[name][f'{level}-id']
 
-            fileHandler.write(f'{accession} > {name} > {taxId} > {popularName} > {chromosomesFolderPath} > {kingdom} > {taxon} > {taxonId}\n')
+            commandParts = []
+            for level in taxonInfos[name]['taxonomy']:
+                if 'id' in level: continue
+                taxon, taxonId = taxonInfos[name]['taxonomy'][level], taxonInfos[name]['taxonomy'][f'{level}-id']
+                commandParts.append(f'{level}<{taxon}<{taxonId}')
+
+            command = ' | '.join(commandParts)
+            fileHandler.write(f'{accession} > {name} > {taxId} > {popularName} > {chromosomesFolderPath} > {command}\n')
 
 
 
@@ -1152,7 +1165,9 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
 
 
 
-def taxonDetection(level='phylum', __readyFile=None, __taxonFile=None, verbose=1):
+def taxonCollection(__readyFile=None, __taxonFile=None, verbose=1):
+    global globalTaxonLevels
+
     if __readyFile == None:
         global globalReadyFile
         readyFile = globalReadyFile
@@ -1180,36 +1195,37 @@ def taxonDetection(level='phylum', __readyFile=None, __taxonFile=None, verbose=1
     skipped = 0
     taxonInfos = {}
 
-    print(f'{tabulation}{magenta(f"Taxon ({level}) collection starting" + " | " + numberP(len(readyLines)) + magenta(" genomes")):^140}\n')
+    print(f'{tabulation}{magenta(f"Taxonomy collection starting" + " | " + numberP(len(readyLines)) + magenta(" genomes")):^140}\n')
     totalIndexing = len(list(readyInfos.keys()))
     indexingSize = len(str(totalIndexing))
     for i, organismName in enumerate(readyInfos, 1):
         chromosomesFolder = readyInfos[organismName]['chromosomes-folder']
         popularName = readyInfos[organismName]['popular-name']
         accession = readyInfos[organismName]['accession']
-        kingdom = readyInfos[organismName]['kingdom']
         taxId = readyInfos[organismName]['tax-id']
         name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
 
-        shellTaxonCollected = os.popen(f'if [ -e {globalGenomesPath}/{accession}/{level}.status ]; then echo "1"; else echo "0"; fi;')
+        shellTaxonCollected = os.popen(f'if [ -e {globalGenomesPath}/{accession}/taxonomy.status ]; then echo "1"; else echo "0"; fi;')
         if int(shellTaxonCollected.read()):
-            shellTaxon = os.popen(f'cat {globalGenomesPath}/{accession}/{level}.status')
+            if verbose:
+                print(f'{tabulation}{yellow(name)}:')
+                ps(red('Already passed taxonomy collection'))
+                pe(magenta('Skipping organism'))
+                print()
+
+            shellTaxon = os.popen(f'cat {globalGenomesPath}/{accession}/taxonomy.status')
             shellTaxonRead = shellTaxon.read().strip('\n')
             shellTaxon.close()
 
-            taxon, taxonId = shellTaxonRead.split(' > ')
-
             taxonInfos[organismName] = readyInfos[organismName]
-            taxonInfos[organismName][level] = taxon
-            taxonInfos[organismName][f'{level}-id'] = taxonId
+            taxonInfos[organismName]['taxonomy'] = {}
+            taxonomyLines = shellTaxonRead.split(' > ')
+            for line in taxonomyLines:
+                level, taxon, taxonId = line.split('<')
+                taxonInfos[organismName]['taxonomy'][level] = taxon
+                taxonInfos[organismName]['taxonomy'][f'{level}-id'] = taxonId
 
             found += 1
-
-            if verbose:
-                print(f'{tabulation}{yellow(name)}:')
-                ps(red('Already passed collection'))
-                pe(magenta('Skipping organism'))
-                print()
 
             continue
 
@@ -1217,7 +1233,7 @@ def taxonDetection(level='phylum', __readyFile=None, __taxonFile=None, verbose=1
             print(f'{tabulation}{yellow(name)}:')
 
         try:
-            os.chdir(chromosomesFolder + '/..')
+            os.chdir(f'{globalGenomesPath}/{accession}')
             if verbose:
                 ps(green('Download folder found'))
                 pe(cyan('Attempting collection'))
@@ -1245,26 +1261,37 @@ def taxonDetection(level='phylum', __readyFile=None, __taxonFile=None, verbose=1
                     print(j, summa, e)
                     sys.exit()
 
-            try:
-                taxonSummary = summary[0]['taxonomy']['classification'][level]
-                taxon, taxonId = taxonSummary['name'], taxonSummary['id']
-            except Exception as e:
-                if level in str(e):
-                    skipped += 1
-                    ps(red(f'Organism has no {level} (what are you trying to do?)'))
-                    pe(magenta('Skipping organism'))
-                    print()
-                    continue
-                else:
-                    shellTaxon.close()
-                    print(tabulation + red('ERROR:') + str(e))
-                    sys.exit()
+            commandParts = []
+            for level in globalTaxonLevels:
+                if verbose:
+                    ps(yellow(level))
+                
+                try:
+                    taxonSummary = summary[0]['taxonomy']['classification'][level]
+                    taxon, taxonId = taxonSummary['name'], taxonSummary['id']
+                except Exception as e:
+                    if level in str(e):
+                        skipped += 1
+                        pm(red(f'Organism has no {level} (what are you trying to do?)'))
+                        pe(magenta('Skipping taxonomic level!'))
+                        continue
+                    else:
+                        shellTaxon.close()
+                        print(tabulation + red('ERROR:') + str(e))
+                        sys.exit()
 
-            taxonInfos[organismName] = readyInfos[organismName]
-            taxonInfos[organismName][level] = taxon
-            taxonInfos[organismName][f'{level}-id'] = taxonId
+                taxonInfos[organismName] = readyInfos[organismName]
+                taxonInfos[organismName]['taxonomy'] = {}
+                taxonInfos[organismName]['taxonomy'][level] = taxon
+                taxonInfos[organismName]['taxonomy'][f'{level}-id'] = taxonId
+                commandParts.append(f'{level}:{taxon}:{taxonId}')
 
-            shellCreateTaxon = os.popen(f'echo "{taxon} > {taxonId}" > {level}.status')
+                if verbose:
+                    pe(green('Collected'))
+
+            command = ' > '.join(commandParts)
+
+            shellCreateTaxon = os.popen(f'echo "{command}" > taxonomy.status')
             _ = shellCreateTaxon.read()
             shellCreateTaxon.close()
             created = 1
@@ -1273,7 +1300,7 @@ def taxonDetection(level='phylum', __readyFile=None, __taxonFile=None, verbose=1
 
             count += 1
             if verbose:
-                pprint(red(f'{level} collected!'))
+                pprint(red(f'Taxonomy collected!'))
                 print()
         except KeyboardInterrupt:
             shellTaxon.close()
@@ -1295,18 +1322,17 @@ def taxonDetection(level='phylum', __readyFile=None, __taxonFile=None, verbose=1
 
             print(tabulation + red('ERROR:') + str(e))
             sys.exit()
-
-    addToTaxonFile(level, taxonInfos, __taxonFile)
-
+    
+    addToTaxonomyFile(taxonInfos, __taxonFile)
     print(
-        f'{tabulation}{magenta(f"Taxon ({level}) collection finished | ") + numberP(count) + magenta(" genomes processed, ") + numberP(found) + magenta(" found & ")
+        f'{tabulation}{magenta(f"Taxonomy collection finished | ") + numberP(count) + magenta(" genomes processed, ") + numberP(found) + magenta(" found & ")
         + numberP(skipped) + magenta(" skipped"):^175}'
     )
     separator()
 
 
 
-def taxonAnalysis(level='phylum', __taxonFile=None, __detectedFile=None, verbose=1, debug=0):
+def taxonAnalysis(__level='all', __taxonFile=None, __detectedFile=None, verbose=1, debug=0):
     if __taxonFile == None:
         global globalTaxonFile
         taxonFile = globalTaxonFile
@@ -1329,16 +1355,21 @@ def taxonAnalysis(level='phylum', __taxonFile=None, __detectedFile=None, verbose
     for info in taxonLines:
         splitted = info.strip('\n').split(' > ')
         popularName = splitted[3] if splitted[3] != 'None' else None
+        taxonomy = splitted[5].split(' | ')
 
         taxonInfos[splitted[1]] = {
             'accession': splitted[0],
             'tax-id': splitted[2],
             'popular-name': popularName,
-            'chromosomes-folder': splitted[4],
-            'kingdom': splitted[5],
-            level: splitted[6],
-            f'{level}-id': splitted[7]
+            'chromosomes-folder': splitted[4]
         }
+    
+        taxonInfos[splitted[1]]['taxonomy'] = {}
+        for __taxonInfo in taxonomy:
+            print(__taxonInfo)
+            __taxonLevel, __taxonName, __taxonId = __taxonInfo.split('<')
+            taxonInfos[splitted[1]]['taxonomy'][__taxonLevel] = __taxonName
+            taxonInfos[splitted[1]]['taxonomy'][f'{__taxonLevel}-id'] = __taxonId
 
     detectedInfos = {}
     for info in detectedLines:
@@ -1350,56 +1381,68 @@ def taxonAnalysis(level='phylum', __taxonFile=None, __detectedFile=None, verbose
             'tax-id': splitted[2],
             'popular-name': popularName,
             'chromosomes-folder': splitted[4],
-            'kingdom': splitted[5],
+            'kingdom': splitted[5]
         }
-    
-    taxonAnalysis = defaultdict(lambda: {'total': 0, 'found': 0, 'percentage': None})
-    taxonAnalysis['total'] = 0
-    taxonAnalysis['found'] = 0
-    taxonAnalysis['percentage'] = None
 
-    print(f'{tabulation}{magenta(f"Taxon ({level}) analysis starting" + " | " + numberP(len(taxonLines)) + magenta(" genomes")):^140}\n')
+    if __level == 'all':
+        global globalTaxonLevels
+        levels = globalTaxonLevels
+    else:
+        levels = [__l for __l in __level.split(',')]
+
+    print(f'{tabulation}{magenta(f"Taxon ({__level}) analysis starting" + " | " + numberP(len(taxonLines)) + magenta(" genomes")):^140}\n')
+    taxonAnalysis = defaultdict(lambda: {'total': 0, 'found': 0, 'percentage': None})
     totalIndexing = len(list(taxonInfos.keys()))
     indexingSize = len(str(totalIndexing))
     for i, organismName in enumerate(taxonInfos, 1):
-        chromosomesFolder = taxonInfos[organismName]['chromosomes-folder']
+        found = organismName in detectedInfos
+        foundTxt = green('Found') if found else red('Not found')
         popularName = taxonInfos[organismName]['popular-name']
         accession = taxonInfos[organismName]['accession']
-        kingdom = taxonInfos[organismName]['kingdom']
-        taxId = taxonInfos[organismName]['tax-id']
-        taxon = taxonInfos[organismName][level]
-        taxonId = taxonInfos[organismName][f'{level}-id']
-        name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + cyan(f' ({popularName} - {accession})' if popularName != None else f' ({accession})')
+
+        namePart = cyan(f' ({popularName} - {accession}) {foundTxt}' if popularName != None else f' ({accession}) {foundTxt}')
+        name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + namePart
 
         if (verbose):            
             pprint(yellow(name) + ':')
-            ps(magenta(taxon))
+            psTaxa()
 
-        taxonAnalysis['total'] += 1
-        taxonAnalysis[taxon]['total'] += 1
-        if organismName in detectedInfos:
-            taxonAnalysis['found'] += 1
-            taxonAnalysis[taxon]['found'] += 1
+        for i, level in enumerate(levels, 1):
+            if not level in taxonInfos[organismName]['taxonomy']: continue
+            taxon = taxonInfos[organismName]['taxonomy'][level]
             if verbose:
-                pm(green('Found!'))
+                if i == len(levels):
+                    print(cyan(taxon))
+                else:
+                    pmTaxa(cyan(taxon))
+            
+            if not taxon in taxonAnalysis[level]:
+                taxonAnalysis[level][taxon] = {'total': 0, 'found': 0, 'percentage': None}
+
+            taxonAnalysis[level]['total'] += 1
+            taxonAnalysis[level][taxon]['total'] += 1
+            if found:
+                taxonAnalysis[level]['found'] += 1
+                taxonAnalysis[level][taxon]['found'] += 1
 
         if verbose:
-            pe(red('Acounted!'))
+            print()
             print()
 
-    for phy in taxonAnalysis:
-        if phy in ['found', 'total', 'percentage']:
-            continue
+    for level in levels:
+        for phy in taxonAnalysis[level]:
+            if phy in ['found', 'total', 'percentage']:
+                continue
 
-        found = taxonAnalysis[phy]['found']
-        total = taxonAnalysis[phy]['total']
+            found = taxonAnalysis[level][phy]['found']
+            total = taxonAnalysis[level][phy]['total']
+            percentage = f'{100 * (found / total):.2f}%'
+            taxonAnalysis[level][phy]['percentage'] = percentage
+
+        found = taxonAnalysis[level]['found']
+        total = taxonAnalysis[level]['total']
         percentage = f'{100 * (found / total):.2f}%'
-        taxonAnalysis[phy]['percentage'] = percentage
-
-    found = taxonAnalysis['found']
-    total = taxonAnalysis['total']
-    percentage = f'{100 * (found / total):.2f}%'
-    taxonAnalysis['percentage'] = percentage
+        taxonAnalysis[level]['percentage'] = percentage
 
     if debug:
         pretty(taxonAnalysis)
@@ -1407,7 +1450,7 @@ def taxonAnalysis(level='phylum', __taxonFile=None, __detectedFile=None, verbose
             print()
 
     print(
-        f'{tabulation}{magenta(f"Taxon ({level}) analysis finished"):^120}'
+        f'{tabulation}{magenta(f"Taxon ({__level}) analysis finished"):^120}'
     )
     separator()
 
