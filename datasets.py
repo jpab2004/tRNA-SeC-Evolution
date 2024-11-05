@@ -67,6 +67,16 @@ globalTaxonLevelsCheat = {
     'genus': 'g',
     'species': 's'
 }
+globalTaxonLevelsSequence = {
+    'superkingdom': ['superkingdom'],
+    'kingdom': ['superkingdom', 'kingdom'],
+    'phylum': ['superkingdom', 'kingdom', 'phylum'],
+    'class': ['superkingdom', 'kingdom', 'phylum', 'class'],
+    'order': ['superkingdom', 'kingdom', 'phylum', 'class', 'order'],
+    'family': ['superkingdom', 'kingdom', 'phylum', 'class', 'order', 'family'],
+    'genus': ['superkingdom', 'kingdom', 'phylum', 'class', 'order', 'family', 'genus'],
+    'species': ['superkingdom', 'kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species'],
+}
 
 
 
@@ -1348,7 +1358,7 @@ def taxonCollection(__readyFile=None, __taxonomyFile=None, verbose=1):
 
 
 
-def taxonAnalysis(__level='all', __taxonomyFile=None, __detectedFile=None, verbose=1, debug=0):
+def taxonAnalysis(__level='all', __taxonomyFile=None, __detectedFile=None, verbose=1, debug=0, sequential=False):
     if __taxonomyFile == None:
         global globalTaxonomyFile
         taxonomyFile = globalTaxonomyFile
@@ -1404,6 +1414,9 @@ def taxonAnalysis(__level='all', __taxonomyFile=None, __detectedFile=None, verbo
         levels = globalTaxonLevels
     else:
         levels = [__l for __l in __level.split(',')]
+        if ((sequential) and (len(levels) == 1)):
+            global globalTaxonLevelsSequence
+            levels = globalTaxonLevelsSequence[levels[0]]
 
     print(f'{tabulation}{magenta(f"Taxon ({__level}) analysis starting" + " | " + numberP(len(taxonLines)) + magenta(" genomes")):^140}\n')
     taxonAnalysis = defaultdict(lambda: {'total': 0, 'found': 0, 'percentage': None})

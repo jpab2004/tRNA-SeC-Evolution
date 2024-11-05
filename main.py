@@ -53,6 +53,8 @@ parser.add_argument('--taxonomy-file', help='The name for the default taxonomy f
 
 parser.add_argument('--taxon-names', help='The names of the taxons to be analysed.')
 parser.add_argument('--taxon-level', help='The level of the taxon to be analysed.')
+parser.add_argument('--sequential', help='Define if taxon analysis should consider the whole taxonomy sequence.', action='store_true')
+
 parser.add_argument('--reference-range', help='Range of organisms in the taxon to be analysed.')
 parser.add_argument('--range-step', help='The step of the range.')
 
@@ -92,6 +94,8 @@ taxonomyFile = args.taxonomy_file if args.taxonomy_file != None else 'taxonomy'
 
 taxonNames = eval(args.taxon_names) if args.taxon_names != None else __taxonNames
 taxonLevel = args.taxon_level if args.taxon_level != None else 'all'
+sequentialAnalysis = args.sequential
+
 referenceRange = int(args.reference_range) if args.reference_range != None else None
 rangeStep = int(args.range_step) if args.range_step != None else 1
 
@@ -158,8 +162,8 @@ if suppressScan: trnaScanSE(verbose=verboseScan)
 if suppressDetected: findDetectedSeC(verbose=verboseDetected)
 if suppressPreprocess: preprocessSeC(verbose=verbosePreprocess)
 if suppressTaxonomy: taxonCollection(verbose=verboseTaxonomy)
-if suppressTaxonAnalysis: taxonAnalysis(taxonLevel, verbose=verboseTaxonAnalysis)
-if suppressRRS: collectRRS(verbose=verboseRRS)
+if suppressTaxonAnalysis: taxonAnalysis(taxonLevel, verbose=verboseTaxonAnalysis, debug=1, sequential=sequentialAnalysis)
+# if suppressRRS: collectRRS(verbose=verboseRRS)
 
 if referenceRange == None:
     alignMAFFT()
