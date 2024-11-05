@@ -1130,15 +1130,13 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
 
         try:
             shellDetected = os.popen(f'cat *.hits | grep "SeC" -A 2')
-            detectedTRNA = shellDetected.read()[:-1].replace('--\n', '').split('\n')
+            detectedTRNAs = shellDetected.read()[:-1].replace('--\n', '').split('>')[1:]
             shellDetected.close()
 
-            for j, parts in enumerate(zip(detectedTRNA[::3], detectedTRNA[1::3], detectedTRNA[2::3]), 1):
-                headerInfos = parts[0].split(' ')
-                if '>' in parts[2]:
-                    tRNASequence = parts[1]
-                else:
-                    tRNASequence = parts[1] + parts[2]
+            for j, aux in enumerate(detectedTRNAs, 1):
+                part = aux.split('\n')
+                headerInfos = part[0].split(' ')
+                tRNASequence = ''.join(part[1:])
 
                 chromosomeState, chromosomeNumber, tRNANumber = headerInfos[0][1:].split('.')
                 chromosomePosition = headerInfos[1].split(':')[1]
@@ -1484,7 +1482,7 @@ def collectRRS(__detectedFile=None, __taxonomyFile=None, verbose=1, king=None):
         # letterFunc = str.lower
         rssFile = 'General_EUK_SSU_v1.9.fasta'
     elif (king == None):
-        rssFile = 'SILVA_138.2_SSUParc_tax_silva.fasta'
+        rssFile = 'SILVA_138.2_SSURef.rnac'
     else:
         pprint(red('ERROR! INVALID KINGDOM!'))
         pprint(yellow(king))
@@ -1563,8 +1561,8 @@ def collectRRS(__detectedFile=None, __taxonomyFile=None, verbose=1, king=None):
         #     levelTaxId = taxonomyInfos[organismName]['taxonomy'][level]['tax-id']
         #     commandPart += letterFunc(globalTaxonLevelsCheat[level]) + (f'__{levelName}; ' if i<len(taxonomyInfos[organismName]['taxonomy']) else f'__{levelName}')
         # command = f'grep "{commandPart}" {rssFile}'
-        # command = f'grep "{taxonomyInfos[organismName]["taxonomy"]["species"]["name"]}" {rssFile} -A 1'
-        command = f'grep "{organismName}" {rssFile} -A 1'
+        command = f'grep "{taxonomyInfos[organismName]["taxonomy"]["species"]["name"]}" {rssFile} -A 1'
+        # command = f'grep "{organismName}" {rssFile} -A 1'
 
         try:
             shellCollectRSS = os.popen(command)
