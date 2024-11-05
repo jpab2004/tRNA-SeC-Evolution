@@ -1,4 +1,4 @@
-from datasets import collectInfo, downloadGenomes, downloadFetch, trnaScanSE, findDetectedSeC, preprocessSeC, alignMAFFT, taxonCollection, taxonAnalysis
+from datasets import collectInfo, downloadGenomes, downloadFetch, trnaScanSE, findDetectedSeC, preprocessSeC, alignMAFFT, taxonCollection, taxonAnalysis, collectRRS
 from datasets import initiate, pretty
 import os, argparse, sys
 
@@ -49,7 +49,7 @@ parser.add_argument('--ready-file', help='The name for the default ready file in
 parser.add_argument('--detected-file', help='The name for the default detected file information.')
 parser.add_argument('--processed-file', help='The name for the default processed file information.')
 parser.add_argument('--align-file', help='The name for the default alignment file.')
-parser.add_argument('--taxon-file', help='The name for the default taxon file.')
+parser.add_argument('--taxonomy-file', help='The name for the default taxonomy file.')
 
 parser.add_argument('--taxon-names', help='The names of the taxons to be analysed.')
 parser.add_argument('--taxon-level', help='The level of the taxon to be analysed.')
@@ -65,16 +65,18 @@ parser.add_argument('-QF', '--q-fetch', help='Quiet for fetch.', action='store_f
 parser.add_argument('-QS', '--q-scan', help='Quiet for scan.', action='store_false')
 parser.add_argument('-QDe', '--q-detected', help='Quiet for detected tRNAs-SeC.', action='store_false')
 parser.add_argument('-QP', '--q-preprocess', help='Quiet for preprocess tRNAs-SeC.', action='store_false')
-parser.add_argument('-QPh', '--q-taxon', help='Quiet for taxon detection.', action='store_false')
-parser.add_argument('-QPA', '--q-taxana', help='Quiet for taxon analysis.', action='store_false')
+parser.add_argument('-QT', '--q-taxonomy', help='Quiet for taxonomy detection.', action='store_false')
+parser.add_argument('-QTA', '--q-taxana', help='Quiet for taxonomy analysis.', action='store_false')
+parser.add_argument('-QRRS', '--q-rRNAs', help='Quiet for rRNAsmallsubunit collection.', action='store_false')
 
 parser.add_argument('-SD', '--suppress-download', help='Suppress download process.', action='store_false')
 parser.add_argument('-SF', '--suppress-fetch', help='Suppress fetch process.', action='store_false')
 parser.add_argument('-SS', '--suppress-scan', help='Suppress scan process.', action='store_false')
 parser.add_argument('-SDe', '--suppress-detected', help='Suppress detected process.', action='store_false')
 parser.add_argument('-SP', '--suppress-preprocess', help='Suppress preprocess.', action='store_false')
-parser.add_argument('-SPh', '--suppress-taxon', help='Suppress taxon process.', action='store_false')
-parser.add_argument('-SPA', '--suppress-taxana', help='Suppress taxon analysis process.', action='store_false')
+parser.add_argument('-SPh', '--suppress-taxonomy', help='Suppress taxonomy process.', action='store_false')
+parser.add_argument('-SPA', '--suppress-taxana', help='Suppress taxonomy analysis process.', action='store_false')
+parser.add_argument('-SRRS', '--suppress-rRNAs', help='Suppress rRNAsmallsubunit collection.', action='store_false')
 
 args=parser.parse_args()
 
@@ -86,7 +88,7 @@ readyFile = args.ready_file if args.ready_file != None else 'ready'
 detectedFile = args.detected_file if args.detected_file != None else 'detected'
 processedFile = args.processed_file if args.processed_file != None else 'processed'
 alignFile = args.align_file if args.align_file != None else 'align'
-taxonFile = args.taxon_file if args.taxon_file != None else 'taxonomy'
+taxonomyFile = args.taxonomy_file if args.taxonomy_file != None else 'taxonomy'
 
 taxonNames = eval(args.taxon_names) if args.taxon_names != None else __taxonNames
 taxonLevel = args.taxon_level if args.taxon_level != None else 'all'
@@ -103,24 +105,27 @@ if not quiet:
     verboseScan = 0
     verboseDetected = 0
     verbosePreprocess = 0
-    verboseTaxon = 0
+    verboseTaxonomy = 0
     verboseTaxonAnalysis = 0
+    verboseRRS = 0
 else:
     verboseDownload = args.q_download
     verboseFetch = args.q_fetch
     verboseScan = args.q_scan
     verboseDetected = args.q_detected
     verbosePreprocess = args.q_preprocess
-    verboseTaxon = args.q_taxon
+    verboseTaxonomy = args.q_taxonomy
     verboseTaxonAnalysis = args.q_taxana
+    verboseRRS = args.q_rRNAs
 
 suppressDownload = args.suppress_download
 suppressFetch = args.suppress_fetch
 suppressScan = args.suppress_scan
 suppressDetected = args.suppress_detected
 suppressPreprocess = args.suppress_preprocess
-suppressTaxon = args.suppress_taxon
+suppressTaxonomy = args.suppress_taxonomy
 suppressTaxonAnalysis = args.suppress_taxana
+suppressRRS = args.suppress_rRNAs
 
 
 
@@ -135,13 +140,13 @@ files = {
     '__detectedFile': detectedFile + suffix,
     '__processedFile': processedFile + suffix,
     '__alignFile': alignFile,
-    '__taxonFile': taxonFile,
+    '__taxonomyFile': taxonomyFile,
 
     'suppressDownload': not suppressDownload,
     'suppressFetch': not suppressFetch,
     'suppressDetected': not suppressDetected,
     'suppressPreprocess': not suppressPreprocess,
-    'suppressTaxon': not suppressTaxon
+    'suppressTaxonomy': not suppressTaxonomy
 }
 initiate(**files)
 
@@ -152,8 +157,9 @@ if suppressFetch: downloadFetch(verbose=verboseFetch)
 if suppressScan: trnaScanSE(verbose=verboseScan)
 if suppressDetected: findDetectedSeC(verbose=verboseDetected)
 if suppressPreprocess: preprocessSeC(verbose=verbosePreprocess)
-if suppressTaxon: taxonCollection(verbose=verboseTaxon)
-if suppressTaxonAnalysis: taxonAnalysis(taxonLevel, verbose=verboseTaxonAnalysis, debug=1)
+if suppressTaxonomy: taxonCollection(verbose=verboseTaxonomy)
+if suppressTaxonAnalysis: taxonAnalysis(taxonLevel, verbose=verboseTaxonAnalysis)
+if suppressRRS: collectRRS(verbose=verboseRRS)
 
 if referenceRange == None:
     alignMAFFT()

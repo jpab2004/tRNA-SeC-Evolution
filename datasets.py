@@ -51,12 +51,22 @@ createdProcessedFile = False
 globalAlignFile = None
 createdAlignFile = False
 
-globalTaxonFile = None
-createdTaxonFile = False
+globalTaxonomyFile = None
+createdTaxonomyFile = False
 
 globalTRNACount = None
 
 globalTaxonLevels = ['superkingdom', 'kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']
+globalTaxonLevelsCheat = {
+    'superkingdom': 'k',
+    'kingdom': None,
+    'phylum': 'p',
+    'class': 'c',
+    'order': 'o',
+    'family': 'f',
+    'genus': 'g',
+    'species': 's'
+}
 
 
 
@@ -155,13 +165,13 @@ def createAlignFile(__alignFile='align'):
 
     globalAlignFile = os.popen(f'readlink -f {__alignFile}.fasta').read()[:-1]
 
-def createTaxonFile(__taxonFile='taxonomy', suppress=False):
-    global globalTaxonFile, createdTaxonFile
+def createTaxonomyFile(__taxonomyFile='taxonomy', suppress=False):
+    global globalTaxonomyFile, createdTaxonomyFile
     
-    if not suppress: os.system(f'> {__taxonFile}.data')
-    createdTaxonFile = True
+    if not suppress: os.system(f'> {__taxonomyFile}.data')
+    createdTaxonomyFile = True
 
-    globalTaxonFile = os.popen(f'readlink -f {__taxonFile}.data').read()[:-1]
+    globalTaxonomyFile = os.popen(f'readlink -f {__taxonomyFile}.data').read()[:-1]
 
 def initiate(
         __genomesPath='Genomes/',
@@ -170,13 +180,13 @@ def initiate(
         __detectedFile='detected',
         __processedFile='processed',
         __alignFile='align',
-        __taxonFile='taxonomy',
+        __taxonomyFile='taxonomy',
         
         suppressDownload=False,
         suppressFetch=False,
         suppressDetected=False,
         suppressPreprocess=False,
-        suppressTaxon=False
+        suppressTaxonomy=False
     ):
     createGenomesPath(__genomesPath, suppress=suppressDownload)
     createFetchFile(__fetchFile, suppress=suppressFetch)
@@ -184,7 +194,7 @@ def initiate(
     createDetectedFile(__detectedFile, suppress=suppressDetected)
     createProcessedFile(__processedFile, suppress=suppressPreprocess)
     createAlignFile(__alignFile)
-    createTaxonFile(__taxonFile, suppress=suppressTaxon)
+    createTaxonomyFile(__taxonomyFile, suppress=suppressTaxonomy)
 
     return
 
@@ -268,19 +278,19 @@ def addToProcessedFile(processedInfos, __processedFile=None):
 
             fileHandler.write(f'{header}\n{sequence}\n')
 
-def addToTaxonomyFile(taxonInfos, __taxonFile=None):
+def addToTaxonomyFile(taxonInfos, __taxonomyFile=None):
     global globalTaxonLevels
 
-    if __taxonFile == None:
-        global globalTaxonFile
-        taxonFile = globalTaxonFile
+    if __taxonomyFile == None:
+        global globalTaxonomyFile
+        taxonomyFile = globalTaxonomyFile
     else:
-        taxonFile = __taxonFile
+        taxonomyFile = __taxonomyFile
 
-    if not createdTaxonFile:
-        createTaxonFile()
+    if not createdTaxonomyFile:
+        createTaxonomyFile()
 
-    with open(taxonFile, 'a') as fileHandler:
+    with open(taxonomyFile, 'a') as fileHandler:
         for name in taxonInfos:
             accession = taxonInfos[name]['accession']
             taxId = taxonInfos[name]['tax-id']
@@ -324,6 +334,7 @@ def collectInfo(taxons, verbose=1, debug=0, archaea=0):
     print(f'{tabulation}{magenta("Data collection starting"):^120}\n')
     totalIndexing = len(list(taxons.keys()))
     indexingSize = len(str(totalIndexing))
+    numberOfOrganismsTotal = 0
     for i, (taxon, (popularName, kingdom)) in enumerate(sorted(taxons.items()), 1):
         command = f'datasets summary genome taxon "{taxon}"'
         command += f' --reference --assembly-source RefSeq --as-json-lines 2>&1' if (not archaea) else ' --assembly-source RefSeq --as-json-lines 2>&1'
@@ -358,6 +369,7 @@ def collectInfo(taxons, verbose=1, debug=0, archaea=0):
                     species[speciesName]['popular-name'] = popularName
                     species[speciesName]['kingdom'] = kingdom
                     numberOfOrganisms += 1
+                    numberOfOrganismsTotal += 1
                 except Exception as e:
                     print(summary, e)
 
@@ -367,7 +379,7 @@ def collectInfo(taxons, verbose=1, debug=0, archaea=0):
             print(report, e)
             printCollection(name, 0, 0, popularName=popularName)
 
-    print(f'\n{tabulation}{magenta(f"Data collection ended") + " | " + numberP(numberOfOrganisms) + magenta(" total organisms collected"):^140}')
+    print(f'\n{tabulation}{magenta(f"Data collection ended") + " | " + numberP(numberOfOrganismsTotal) + magenta(" total organisms collected"):^140}')
     separator()
 
     if debug:
@@ -1164,7 +1176,7 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
 
 
 
-def taxonCollection(__readyFile=None, __taxonFile=None, verbose=1):
+def taxonCollection(__readyFile=None, __taxonomyFile=None, verbose=1):
     global globalTaxonLevels
 
     if __readyFile == None:
@@ -1247,10 +1259,18 @@ def taxonCollection(__readyFile=None, __taxonFile=None, verbose=1):
 
         try:
             created = 0
-            shellTaxon = os.popen(f'datasets summary taxonomy taxon "{taxId}" --as-json-lines')
+            shellTaxon = os.popen(f'datasets summary taxonomy taxon "{taxId}" --as-json-lines 2>&1')
 
             summaryRead = shellTaxon.read().replace('true', "'true'")[:-1]
             shellTaxon.close()
+
+            if 'does not match any existing taxids' in summaryRead:
+                skipped += 1
+                if verbose:
+                    ps(red(f'No organism found with taxid {taxId}'))
+                    pe(magenta('Skipping organism'))
+                    print()
+                continue
 
             summary = {}
             for j, summa in enumerate(summaryRead.split('\n')):
@@ -1270,7 +1290,6 @@ def taxonCollection(__readyFile=None, __taxonFile=None, verbose=1):
                     taxon, taxonId = taxonSummary['name'], taxonSummary['id']
                 except Exception as e:
                     if level in str(e):
-                        skipped += 1
                         pm(red(f'Organism has no {level} (what are you trying to do?)'))
                         pe(magenta('Skipping taxonomic level!'))
                         continue
@@ -1322,7 +1341,7 @@ def taxonCollection(__readyFile=None, __taxonFile=None, verbose=1):
             print(tabulation + red('ERROR:') + str(e))
             sys.exit()
     
-    addToTaxonomyFile(taxonInfos, __taxonFile)
+    addToTaxonomyFile(taxonInfos, __taxonomyFile)
     print(
         f'{tabulation}{magenta(f"Taxonomy collection finished | ") + numberP(count) + magenta(" genomes processed, ") + numberP(found) + magenta(" found & ")
         + numberP(skipped) + magenta(" skipped"):^175}'
@@ -1331,12 +1350,12 @@ def taxonCollection(__readyFile=None, __taxonFile=None, verbose=1):
 
 
 
-def taxonAnalysis(__level='all', __taxonFile=None, __detectedFile=None, verbose=1, debug=0):
-    if __taxonFile == None:
-        global globalTaxonFile
-        taxonFile = globalTaxonFile
+def taxonAnalysis(__level='all', __taxonomyFile=None, __detectedFile=None, verbose=1, debug=0):
+    if __taxonomyFile == None:
+        global globalTaxonomyFile
+        taxonomyFile = globalTaxonomyFile
     else:
-        taxonFile = __taxonFile
+        taxonomyFile = __taxonomyFile
 
     if __detectedFile == None:
         global globalDetectedFile
@@ -1344,7 +1363,7 @@ def taxonAnalysis(__level='all', __taxonFile=None, __detectedFile=None, verbose=
     else:
         detectedFile = __detectedFile
 
-    with open(taxonFile, 'r') as fileHandler:
+    with open(taxonomyFile, 'r') as fileHandler:
         taxonLines = fileHandler.readlines()
 
     with open(detectedFile, 'r') as fileHandler:
@@ -1365,7 +1384,6 @@ def taxonAnalysis(__level='all', __taxonFile=None, __detectedFile=None, verbose=
     
         taxonInfos[splitted[1]]['taxonomy'] = {}
         for __taxonInfo in taxonomy:
-            print(__taxonInfo)
             __taxonLevel, __taxonName, __taxonId = __taxonInfo.split('<')
             taxonInfos[splitted[1]]['taxonomy'][__taxonLevel] = __taxonName
             taxonInfos[splitted[1]]['taxonomy'][f'{__taxonLevel}-id'] = __taxonId
@@ -1456,8 +1474,127 @@ def taxonAnalysis(__level='all', __taxonFile=None, __detectedFile=None, verbose=
 
 
 
+def collectRRS(__detectedFile=None, __taxonomyFile=None, verbose=1, king=None):
+    global globalTaxonLevelsCheat
+
+    if ((king == 'Archaea') or (king == 'Eubacteria')):
+        # letterFunc = str.upper
+        rssFile = 'MIMt-16S_M2c_24_4.fna'
+    elif (king == 'Eukaryota'):
+        # letterFunc = str.lower
+        rssFile = 'General_EUK_SSU_v1.9.fasta'
+    elif (king == None):
+        rssFile = 'SILVA_138.2_SSUParc_tax_silva.fasta'
+    else:
+        pprint(red('ERROR! INVALID KINGDOM!'))
+        pprint(yellow(king))
+        sys.exit()
+
+    if __detectedFile == None:
+        global globalDetectedFile
+        detectedFile = globalDetectedFile
+    else:
+        detectedFile = __detectedFile
+    
+    if __taxonomyFile == None:
+        global globalTaxonomyFile
+        taxonomyFile = globalTaxonomyFile
+    else:
+        taxonomyFile = __taxonomyFile
+
+    with open(detectedFile) as fileHandler:
+        detectedLines = fileHandler.readlines()
+
+    with open(taxonomyFile) as fileHandler:
+        taxonomyLines = fileHandler.readlines()
+
+    detectedNames = [splitted.strip('\n').split(' > ')[1] for splitted in detectedLines]
+
+    taxonomyInfos = {}
+    for line in taxonomyLines:
+        accession, organismName, taxId, popularName, chrFolder, taxonomy = line.strip('\n').split(' > ')
+        popularName = popularName if popularName != 'None' else None
+
+        if not organismName in detectedNames: continue
+
+        taxonomyInfos[organismName] = {
+            'accession': accession,
+            'tax-id': taxId,
+            'popular-name': popularName,
+            'chromosomes-folder': chrFolder
+        }
+
+        taxonomyInfos[organismName]['taxonomy'] = {}
+        for info in taxonomy.split(' | '):
+            level, name, taxId = info.split('<')
+            taxonomyInfos[organismName]['taxonomy'][level] = {'name': name, 'tax-id': taxId}
+
+    print(f'{tabulation}{magenta(f"rRNAs collection starting" + " | " + numberP(len(detectedNames)) + magenta(" genomes")):^140}')
+    totalIndexing = len(list(taxonomyInfos.keys()))
+    indexingSize = len(str(totalIndexing))
+
+    try:
+        global globalGenomesPath
+        os.chdir(globalGenomesPath + '/../16-18S DB')
+        if verbose:
+            print(f'{green("16S and 18S Databases folder found!") + magenta(" | ") + magenta("Attempting collection"):^215}')
+            print()
+    except Exception as e:
+        print(tabulation + red('ERROR:') + str(e))
+        sys.exit()
+
+    found = 0
+    tot = 0
+    for i, organismName in enumerate(taxonomyInfos, 1):
+        popularName = taxonomyInfos[organismName]['popular-name']
+        accession = taxonomyInfos[organismName]['accession']
+        taxId = taxonomyInfos[organismName]['tax-id']
+
+        namePart = cyan(f' ({popularName} - {accession}/{taxId})' if popularName != None else f' ({accession}/{taxId})')
+        name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + namePart
+
+        if (verbose):            
+            pprint(yellow(name) + ':')
+
+        # commandPart = ''
+        # for i, level in enumerate(taxonomyInfos[organismName]['taxonomy'], 1):
+        #     if level == 'kingdom': continue
+        #     levelName = taxonomyInfos[organismName]['taxonomy'][level]['name']
+        #     levelTaxId = taxonomyInfos[organismName]['taxonomy'][level]['tax-id']
+        #     commandPart += letterFunc(globalTaxonLevelsCheat[level]) + (f'__{levelName}; ' if i<len(taxonomyInfos[organismName]['taxonomy']) else f'__{levelName}')
+        # command = f'grep "{commandPart}" {rssFile}'
+        # command = f'grep "{taxonomyInfos[organismName]["taxonomy"]["species"]["name"]}" {rssFile} -A 1'
+        command = f'grep "{organismName}" {rssFile} -A 1'
+
+        try:
+            shellCollectRSS = os.popen(command)
+            readCollectRSS = shellCollectRSS.read().replace('--\n', '')
+            shellCollectRSS.close()
+        except Exception as e:
+            print(tabulation + red('ERROR:') + str(e))
+            sys.exit()
+
+        print(tabulation + command)
+        print(tabulation + readCollectRSS)
+        found += 1 if readCollectRSS != '' else 0
+
+        if verbose:
+            print()
+
+    print(tabulation + red(found))
+
+    print(
+        f'{tabulation}{magenta(f"rRNAs collection finished"):^120}'
+    )
+    separator()
+
+
+
 def alignMAFFT(__processedFile=None, __alignFile=None, progress=0):
     global globalTRNACount
+
+    if globalTRNACount == None: tRNACount = red('UNDEFINED!')
+    else: tRNACount = numberP(globalTRNACount)
 
     if __processedFile == None:
         global globalProcessedFile
@@ -1471,7 +1608,7 @@ def alignMAFFT(__processedFile=None, __alignFile=None, progress=0):
     else:
         alignFile = __alignFile
 
-    print(f'{tabulation}{magenta(f"MAFFT alignment starting" + " | " + numberP(globalTRNACount) + magenta(" tRNAs-SeC")):^140}\n')
+    print(f'{tabulation}{magenta(f"MAFFT alignment starting" + " | " + tRNACount + magenta(" tRNAs-SeC")):^140}\n')
     try:
         args = '--auto --reorder'
         if not progress:
