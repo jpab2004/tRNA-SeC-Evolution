@@ -1081,7 +1081,7 @@ def findDetectedSeC(__readyFile=None, __detectedFile=None, verbose=1):
 
 
 
-def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
+def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1, debug=1):
     global globalTRNACount
 
     if __detectedFile == None:
@@ -1143,10 +1143,19 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1):
             detectedTRNAs = shellDetected.read()[:-1].replace('--\n', '').split('>')[1:]
             shellDetected.close()
 
+            if debug:
+                print(detectedTRNAs, end='\n\n')
+
             for j, aux in enumerate(detectedTRNAs, 1):
                 part = aux.split('\n')
                 headerInfos = part[0].split(' ')
                 tRNASequence = ''.join(part[1:])
+
+                if tRNASequence == '':
+                    continue
+
+                if debug:
+                    print(headerInfos, tRNASequence, sep='\n')
 
                 chromosomeState, chromosomeNumber, tRNANumber = headerInfos[0][1:].split('.')
                 chromosomePosition = headerInfos[1].split(':')[1]

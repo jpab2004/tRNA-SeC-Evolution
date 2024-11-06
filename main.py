@@ -36,7 +36,7 @@ __taxonNames = {
     # 'Wallemia': ('Fungo Monocas', 'E'),
 
     # Achea
-    'Archaea': ['Arqueias', 'A']
+    # 'Archaea': ['Arqueias', 'A']
 }
 
 
@@ -160,9 +160,9 @@ if suppressDownload: downloadGenomes(species, sizeLimit=20, referenceRange=refer
 if suppressFetch: downloadFetch(verbose=verboseFetch)
 if suppressScan: trnaScanSE(verbose=verboseScan)
 if suppressDetected: findDetectedSeC(verbose=verboseDetected)
-if suppressPreprocess: preprocessSeC(verbose=verbosePreprocess)
+if suppressPreprocess: preprocessSeC(verbose=verbosePreprocess, debug=0)
 if suppressTaxonomy: taxonCollection(verbose=verboseTaxonomy)
-if suppressTaxonAnalysis: taxonAnalysis(taxonLevel, verbose=verboseTaxonAnalysis, debug=1, sequential=sequentialAnalysis)
+if suppressTaxonAnalysis: taxonAnalysis(taxonLevel, verbose=verboseTaxonAnalysis, sequential=sequentialAnalysis, debug=0)
 # if suppressRRS: collectRRS(verbose=verboseRRS)
 
 if referenceRange == None:
