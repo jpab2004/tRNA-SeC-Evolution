@@ -1081,8 +1081,8 @@ def findDetectedSeC(__readyFile=None, __detectedFile=None, verbose=1):
 
 
 
-def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1, debug=1):
-    global globalTRNACount
+def preprocessSeC(__detectedFile=None, __taxonomyFile=None, __processedFile=None, verbose=1, debug=1):
+    global globalTRNACount, globalTaxonLevels
 
     if __detectedFile == None:
         global globalDetectedFile
@@ -1090,8 +1090,17 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1, debug=1)
     else:
         detectedFile = __detectedFile
 
+    if __taxonomyFile == None:
+        global globalTaxonomyFile
+        taxonomyFile = globalTaxonomyFile
+    else:
+        taxonomyFile = __taxonomyFile
+
     with open(detectedFile, 'r') as fileHandler:
         detectedLines = fileHandler.readlines()
+
+    with open(taxonomyFile, 'r') as fileHandler:
+        taxonLines = fileHandler.readlines()
     
     detectedInfos = {}
     for info in detectedLines:
@@ -1105,6 +1114,25 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1, debug=1)
             'chromosomes-folder': splitted[4],
             'kingdom': splitted[5]
         }
+    
+    taxonInfos = {}
+    for info in taxonLines:
+        splitted = info.strip('\n').split(' > ')
+        popularName = splitted[3] if splitted[3] != 'None' else None
+        taxonomy = splitted[5].split(' | ')
+
+        taxonInfos[splitted[1]] = {
+            'accession': splitted[0],
+            'tax-id': splitted[2],
+            'popular-name': popularName,
+            'chromosomes-folder': splitted[4]
+        }
+    
+        taxonInfos[splitted[1]]['taxonomy'] = {}
+        for __taxonInfo in taxonomy:
+            __taxonLevel, __taxonName, __taxonId = __taxonInfo.split('<')
+            taxonInfos[splitted[1]]['taxonomy'][__taxonLevel] = __taxonName
+            taxonInfos[splitted[1]]['taxonomy'][f'{__taxonLevel}-id'] = __taxonId
 
     count = 0
     tRNAs = 0
@@ -1120,6 +1148,11 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1, debug=1)
         accession = detectedInfos[organismName]['accession']
         taxId = detectedInfos[organismName]['tax-id']
         name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + cyan(f' ({popularName} - {accession}/{taxId})' if popularName != None else f' ({accession}/{taxId})')
+
+        for __level in globalTaxonLevels:
+            if __level in taxonInfos[organismName]['taxonomy']:
+                taxon = taxonInfos[organismName]['taxonomy'][__level]
+                break
 
         if (verbose):            
             print(f'{tabulation}{yellow(name)}:')
@@ -1161,12 +1194,15 @@ def preprocessSeC(__detectedFile=None, __processedFile=None, verbose=1, debug=1)
                 chromosomePosition = headerInfos[1].split(':')[1]
                 strand, size, score = headerInfos[2], headerInfos[5], headerInfos[8]
 
-                #f'>{kingdom}.{organismName.replace(" ", "_")}.{tRNANumber} | {kingdom}_{chromosomeState}.{chromosomeNumber}:{chromosomePosition} | {strand}_{size}_{score}'
-                # headerFinal = f'>{kingdom}.SeC-{j}.{organismName.replace(".", " ").replace(" ", "_")}'
+                # headerFinal = f'''
+                #     >{taxon}.{organismName.replace(" ", "_")}.{tRNANumber} | 
+                #     {taxon}_{chromosomeState}.{chromosomeNumber}:{chromosomePosition} | 
+                #     {strand}_{size}_{score}
+                # '''.replace('\n                    ', '').replace('\n', '')
+                # headerFinal = f'>{taxon}.SeC-{j}.{organismName.replace(".", " ").replace(" ", "_")}'
                 # headerFinal = f'>{taxId}.SeC-{j}.{organismName.replace(" ", "_")}'
-                headerFinal = f'>{taxId}.{j}'
+                headerFinal = f'>{taxon}.{organismName.replace(" ", "_")}.{taxId}.{j}'
 
-                # processedInfos[f'{organismName}.{j}'] = {'info': detectedInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
                 processedInfos[f'{organismName}.{j}'] = {'info': detectedInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
                 tRNAs += 1
             count += 1
