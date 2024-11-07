@@ -405,7 +405,7 @@ def collectInfo(taxons, verbose=1, archaea=0, save=0, read=0, __speciesFile=None
     separator()
     print(f'{tabulation}{magenta("Data collection starting"):^120}\n')
 
-    if read:
+    if ((read) and (not save)):
         print(f'{tabulation}{green("Read flag detected") + " | " + magenta("Trying to read file"):^130}\n')
 
         with open(speciesFile, 'rb') as fileHandler:
