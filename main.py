@@ -1,4 +1,4 @@
-from datasets import collectInfo, downloadGenomes, downloadFetch, trnaScanSE, findDetectedSeC, preprocessSeC, alignMAFFT, taxonCollection, taxonAnalysis, collectRRS
+from datasets import collectInfo, downloadGenomes, downloadFetch, trnaScanSE, findDetectedSeC, preprocessAndMetadata, alignMAFFT, taxonCollection, taxonAnalysis, collectRRS
 from datasets import initiate, pretty
 import os, argparse, sys
 
@@ -44,6 +44,7 @@ __taxonNames = {
 parser=argparse.ArgumentParser()
 
 parser.add_argument('--genomes-path', help='Path for the genomes to be stored.')
+parser.add_argument('--species-file', help='The name for the default species file information.')
 parser.add_argument('--fetch-file', help='The name for the default fetch file information.')
 parser.add_argument('--ready-file', help='The name for the default ready file information.')
 parser.add_argument('--detected-file', help='The name for the default detected file information.')
@@ -51,6 +52,9 @@ parser.add_argument('--processed-file', help='The name for the default processed
 parser.add_argument('--align-file', help='The name for the default alignment file.')
 parser.add_argument('--taxonomy-file', help='The name for the default taxonomy file.')
 parser.add_argument('--metadata-file', help='The name for the default metadata file.')
+
+parser.add_argument('--read-species', help='Read species file.', action='store_true')
+parser.add_argument('--save-species', help='Save species file.', action='store_true')
 
 parser.add_argument('--taxon-names', help='The names of the taxons to be analysed.')
 parser.add_argument('--taxon-level', help='The level of the taxon to be analysed.')
@@ -88,6 +92,7 @@ args=parser.parse_args()
 
 
 genomesPath = args.genomes_path if args.genomes_path != None else 'GenomesArchaeaExpanded/'
+speciesFile = args.species_file if args.species_file != None else 'species.pickle'
 fetchFile = args.fetch_file if args.fetch_file != None else 'fetch'
 readyFile = args.ready_file if args.ready_file != None else 'ready'
 detectedFile = args.detected_file if args.detected_file != None else 'detected'
@@ -95,6 +100,9 @@ processedFile = args.processed_file if args.processed_file != None else 'process
 alignFile = args.align_file if args.align_file != None else 'align'
 taxonomyFile = args.taxonomy_file if args.taxonomy_file != None else 'taxonomy'
 metadataFile = args.metadata_file if args.metadata_file != None else 'metadata'
+
+read = args.read_species
+save = args.save_species
 
 taxonNames = eval(args.taxon_names) if args.taxon_names != None else __taxonNames
 taxonLevel = args.taxon_level if args.taxon_level != None else 'all'
@@ -157,18 +165,19 @@ files = {
     'suppressFetch': not suppressFetch,
     'suppressDetected': not suppressDetected,
     'suppressPreprocess': not suppressPreprocess,
-    'suppressTaxonomy': not suppressTaxonomy
+    'suppressTaxonomy': not suppressTaxonomy,
+    'suppressAlign': not suppressAlign
 }
 initiate(**files)
 
-species = collectInfo(taxonNames, archaea=refseq)
+species = collectInfo(taxonNames, archaea=refseq, save=save, read=read, __speciesFile=speciesFile)
 
 if suppressDownload: downloadGenomes(species, sizeLimit=20, referenceRange=referenceRange, rangeStep=rangeStep, reDownload=reDownload, verbose=verboseDownload)
 if suppressFetch: downloadFetch(verbose=verboseFetch)
 if suppressScan: trnaScanSE(verbose=verboseScan)
 if suppressDetected: findDetectedSeC(verbose=verboseDetected)
 if suppressTaxonomy: taxonCollection(verbose=verboseTaxonomy)
-if suppressPreprocess: preprocessSeC(verbose=verbosePreprocess, debug=0)
+if suppressPreprocess: preprocessAndMetadata(verbose=verbosePreprocess, debug=0)
 if suppressTaxonAnalysis: taxonAnalysis(taxonLevel, verbose=verboseTaxonAnalysis, sequential=sequentialAnalysis, debug=0)
 # if suppressRRS: collectRRS(verbose=verboseRRS)
 

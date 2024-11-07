@@ -3,7 +3,7 @@ from collections import defaultdict, deque
 from termcolor import colored
 import os, sys, glob, ast
 from json import dumps
-import random
+import random, pickle
 
 
 
@@ -36,6 +36,8 @@ pmTaxa = lambda x: print(f'{x} -> ', end='', flush=True)
 # Consts
 globalGenomesPath = None
 createdGenomesPath = False
+
+globalSpeciesFile = 'species.pickle'
 
 globalFetchFile = None
 createdFetchFile = False
@@ -180,10 +182,10 @@ def createProcessedFile(__processedFile='processed', suppress=False):
 
     globalProcessedFile = os.popen(f'readlink -f {__processedFile}.fna').read()[:-1]
 
-def createAlignFile(__alignFile='align'):
+def createAlignFile(__alignFile='align', suppress=False):
     global globalAlignFile, createdAlignFile
     
-    os.system(f'> {__alignFile}.fasta')
+    if not suppress: os.system(f'> {__alignFile}.fasta')
     createdAlignFile = True
 
     globalAlignFile = os.popen(f'readlink -f {__alignFile}.fasta').read()[:-1]
@@ -218,14 +220,15 @@ def initiate(
         suppressFetch=False,
         suppressDetected=False,
         suppressPreprocess=False,
-        suppressTaxonomy=False
+        suppressTaxonomy=False,
+        suppressAlign=False
     ):
     createGenomesPath(__genomesPath, suppress=suppressDownload)
     createFetchFile(__fetchFile, suppress=suppressFetch)
     createReadyFile(__readyFile, suppress=(suppressDownload and suppressFetch))
     createDetectedFile(__detectedFile, suppress=suppressDetected)
     createProcessedFile(__processedFile, suppress=suppressPreprocess)
-    createAlignFile(__alignFile)
+    createAlignFile(__alignFile, suppress=suppressAlign)
     createTaxonomyFile(__taxonomyFile, suppress=suppressTaxonomy)
     createMetadataFile(__metadataFile, suppress=suppressPreprocess)
 
@@ -350,11 +353,13 @@ def addToMetadataFile(metadataInfos, __metadataFile=None):
         createMetadataFile()
 
     with open(metadataFile, 'a') as fileHandler:
-        fileHandler.write('id;taxon\n')
+        fileHandler.write('ID;taxID;tRNA-SeC number\n')
         for identification in metadataInfos:
-            taxon = metadataInfos[identification]['taxon']
+            taxId = metadataInfos[identification]['tax-id']
+            taxonomy = metadataInfos[identification]['taxonomy']
+            tRNANumber = metadataInfos[identification]['trna-number']
 
-            fileHandler.write(f'{identification};{taxon}\n')
+            fileHandler.write(f'{identification};{taxId};{tRNANumber}\n')
 
 
 
@@ -377,65 +382,81 @@ def pretty(value, sort_keys=True, indent=4, colorOrder=[green, blue, red, cyan, 
 
 
 # Collection of organism data (accession and assembly level)
-def collectInfo(taxons, verbose=1, debug=0, archaea=0):
+def collectInfo(taxons, verbose=1, archaea=0, save=0, read=0, __speciesFile=None):
     species = defaultdict(lambda: {'accession': None})
+
+    if __speciesFile == None:
+        global globalSpeciesFile
+        speciesFile = globalSpeciesFile
+    else:
+        speciesFile = __speciesFile
 
     separator()
     print(f'{tabulation}{magenta("Data collection starting"):^120}\n')
-    totalIndexing = len(list(taxons.keys()))
-    indexingSize = len(str(totalIndexing))
-    numberOfOrganismsTotal = 0
-    for i, (taxon, (popularName, kingdom)) in enumerate(sorted(taxons.items()), 1):
-        command = f'datasets summary genome taxon "{taxon}"'
-        command += f' --reference --assembly-source RefSeq --as-json-lines 2>&1' if (not archaea) else ' --assembly-source RefSeq --as-json-lines 2>&1'
-        shell = os.popen(command)
-        summaryRead = shell.read().replace('true', "'true'")[:-1]
-        name = f'{i:<{indexingSize}}/{totalIndexing}. {taxon}'
-        shell.close()
 
-        if 'but no genome data is currently available for this taxon' in summaryRead:
-            printCollection(name, 0, 2, popularName=popularName)
-            continue
-        elif 'New version of client' in summaryRead:
-            printCollection('', 0, 3)
-            continue
+    if read:
+        print(f'{tabulation}{green("Read flag detected") + " | " + magenta("Trying to read file"):^130}\n')
 
-        summary = {}
-        for j, summa in enumerate(summaryRead.split('\n')):
-            try:
-                summary[j] = ast.literal_eval(summa)
-            except Exception as e:
-                print(j, summa, e)
-                sys.exit()
-        
-        numberOfOrganisms = 0
-        try:
-            for report in summary.values():
+        with open(speciesFile, 'rb') as fileHandler:
+            species = pickle.load(fileHandler)
+
+        print(f'{tabulation}{green("Read successful"):^120}')
+        separator()
+    else:
+        totalIndexing = len(list(taxons.keys()))
+        indexingSize = len(str(totalIndexing))
+        numberOfOrganismsTotal = 0
+        for i, (taxon, (popularName, kingdom)) in enumerate(sorted(taxons.items()), 1):
+            command = f'datasets summary genome taxon "{taxon}"'
+            command += f' --reference --assembly-source RefSeq --as-json-lines 2>&1' if (not archaea) else ' --assembly-source RefSeq --as-json-lines 2>&1'
+            shell = os.popen(command)
+            summaryRead = shell.read().replace('true', "'true'")[:-1]
+            name = f'{i:<{indexingSize}}/{totalIndexing}. {taxon}'
+            shell.close()
+
+            if 'but no genome data is currently available for this taxon' in summaryRead:
+                printCollection(name, 0, 2, popularName=popularName)
+                continue
+            elif 'New version of client' in summaryRead:
+                printCollection('', 0, 3)
+                continue
+
+            summary = {}
+            for j, summa in enumerate(summaryRead.split('\n')):
                 try:
-                    speciesName = report['organism']['organism_name']
-                    species[speciesName]['tax-id'] = report['organism']['tax_id']
-                    species[speciesName]['accession'] = report['accession']
-                    species[speciesName]['filesize-unit'] = sizeOf(int(report["assembly_stats"]["total_sequence_length"]))
-                    species[speciesName]['popular-name'] = popularName
-                    species[speciesName]['kingdom'] = kingdom
-                    numberOfOrganisms += 1
-                    numberOfOrganismsTotal += 1
+                    summary[j] = ast.literal_eval(summa)
                 except Exception as e:
-                    print(summary, e)
+                    print(j, summa, e)
+                    sys.exit()
+            
+            numberOfOrganisms = 0
+            try:
+                for report in summary.values():
+                    try:
+                        speciesName = report['organism']['organism_name']
+                        species[speciesName]['tax-id'] = report['organism']['tax_id']
+                        species[speciesName]['accession'] = report['accession']
+                        species[speciesName]['filesize-unit'] = sizeOf(int(report["assembly_stats"]["total_sequence_length"]))
+                        species[speciesName]['popular-name'] = popularName
+                        species[speciesName]['kingdom'] = kingdom
+                        numberOfOrganisms += 1
+                        numberOfOrganismsTotal += 1
+                    except Exception as e:
+                        print(summary, e)
 
-            if verbose:
-                printCollection(name, numberOfOrganisms, 1, popularName=popularName)
-        except Exception as e:
-            print(report, e)
-            printCollection(name, 0, 0, popularName=popularName)
+                if verbose:
+                    printCollection(name, numberOfOrganisms, 1, popularName=popularName)
+            except Exception as e:
+                print(report, e)
+                printCollection(name, 0, 0, popularName=popularName)
 
-    print(f'\n{tabulation}{magenta(f"Data collection ended") + " | " + numberP(numberOfOrganismsTotal) + magenta(" total organisms collected"):^140}')
-    separator()
+        print(f'\n{tabulation}{magenta(f"Data collection ended") + " | " + numberP(numberOfOrganismsTotal) + magenta(" total organisms collected"):^140}')
+        separator()
 
-    if debug:
-        print('Species = ', end='')
-        pretty(species)
-        print()
+    if save:
+        with open(speciesFile, 'wb') as fileHandler:
+            aux = dict(species)
+            pickle.dump(aux, fileHandler, protocol=pickle.HIGHEST_PROTOCOL)
 
     return species
 
@@ -1295,7 +1316,7 @@ def taxonCollection(__readyFile=None, __taxonomyFile=None, verbose=1):
 
 
 
-def preprocessSeC(__detectedFile=None, __taxonomyFile=None, __processedFile=None, __metadataFile=None, verbose=1, debug=1):
+def preprocessAndMetadata(__detectedFile=None, __taxonomyFile=None, __processedFile=None, __metadataFile=None, verbose=1, debug=1):
     global globalTRNACount, globalTaxonLevels
 
 
@@ -1335,24 +1356,24 @@ def preprocessSeC(__detectedFile=None, __taxonomyFile=None, __processedFile=None
             'kingdom': splitted[5]
         }
     
-    taxonInfos = {}
+    taxonomyInfos = {}
     for info in taxonLines:
         splitted = info.strip('\n').split(' > ')
         popularName = splitted[3] if splitted[3] != 'None' else None
         taxonomy = splitted[5].split(' | ')
 
-        taxonInfos[splitted[1]] = {
+        taxonomyInfos[splitted[1]] = {
             'accession': splitted[0],
             'tax-id': splitted[2],
             'popular-name': popularName,
             'chromosomes-folder': splitted[4]
         }
     
-        taxonInfos[splitted[1]]['taxonomy'] = {}
+        taxonomyInfos[splitted[1]]['taxonomy'] = {}
         for __taxonInfo in taxonomy:
             __taxonLevel, __taxonName, __taxonId = __taxonInfo.split('<')
-            taxonInfos[splitted[1]]['taxonomy'][__taxonLevel] = __taxonName
-            taxonInfos[splitted[1]]['taxonomy'][f'{__taxonLevel}-id'] = __taxonId
+            taxonomyInfos[splitted[1]]['taxonomy'][__taxonLevel] = __taxonName
+            taxonomyInfos[splitted[1]]['taxonomy'][f'{__taxonLevel}-id'] = __taxonId
 
 
 
@@ -1373,11 +1394,6 @@ def preprocessSeC(__detectedFile=None, __taxonomyFile=None, __processedFile=None
         accession = detectedInfos[organismName]['accession']
         taxId = detectedInfos[organismName]['tax-id']
         name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + cyan(f' ({popularName} - {accession}/{taxId})' if popularName != None else f' ({accession}/{taxId})')
-
-        for __level in globalTaxonLevels:
-            if __level in taxonInfos[organismName]['taxonomy']:
-                taxon = taxonInfos[organismName]['taxonomy'][__level]
-                break
 
         if (verbose):            
             print(f'{tabulation}{yellow(name)}:')
@@ -1427,10 +1443,12 @@ def preprocessSeC(__detectedFile=None, __taxonomyFile=None, __processedFile=None
                 # headerFinal = f'>{taxon}.SeC-{j}.{organismName.replace(".", " ").replace(" ", "_")}'
                 # headerFinal = f'>{taxId}.SeC-{j}.{organismName.replace(" ", "_")}'
                 # headerFinal = f'>{taxon}.{organismName.replace(" ", "_")}.{taxId}.{j}'
-                headerFinal = f'>{taxId}.{j}'
+                # headerFinal = f'>{taxId}.{j}'
+                headerFinal = f'>{i}'
 
-                metadataInfos[headerFinal[1:]] = {'taxon': taxon}
+                metadataInfos[headerFinal[1:]] = {'taxonomy': taxonomyInfos[organismName]['taxonomy'], 'tax-id': taxId, 'trna-number': j}
                 processedInfos[f'{organismName}.{j}'] = {'info': detectedInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
+
                 tRNAs += 1
             count += 1
         except KeyboardInterrupt:
