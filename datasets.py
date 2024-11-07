@@ -343,6 +343,8 @@ def addToTaxonomyFile(taxonInfos, __taxonomyFile=None):
             fileHandler.write(f'{accession} > {name} > {taxId} > {popularName} > {chromosomesFolderPath} > {command}\n')
 
 def addToMetadataFile(metadataInfos, __metadataFile=None):
+    global globalTaxonLevels
+
     if __metadataFile == None:
         global globalMetadataFile
         metadataFile = globalMetadataFile
@@ -353,13 +355,22 @@ def addToMetadataFile(metadataInfos, __metadataFile=None):
         createMetadataFile()
 
     with open(metadataFile, 'a') as fileHandler:
-        fileHandler.write('ID;taxID;tRNA-SeC number\n')
+        taxonsTextGeneral = ';'.join(globalTaxonLevels)
+        firstLine = f'ID;taxID;tRNA-SeC number;{taxonsTextGeneral}\n'
+        fileHandler.write(firstLine)
         for identification in metadataInfos:
             taxId = metadataInfos[identification]['tax-id']
             taxonomy = metadataInfos[identification]['taxonomy']
             tRNANumber = metadataInfos[identification]['trna-number']
 
-            fileHandler.write(f'{identification};{taxId};{tRNANumber}\n')
+            taxons = []
+            for __level in globalTaxonLevels:
+                taxons.append(taxonomy[__level] if __level in taxonomy else str(None))
+            taxonsText = ';'.join(taxons)
+
+            text = f'{identification};{taxId};{tRNANumber};{taxonsText}\n'
+
+            fileHandler.write(text)
 
 
 
@@ -1377,6 +1388,7 @@ def preprocessAndMetadata(__detectedFile=None, __taxonomyFile=None, __processedF
 
 
 
+    index = 1
     count = 0
     tRNAs = 0
     skipped = 0
@@ -1444,12 +1456,13 @@ def preprocessAndMetadata(__detectedFile=None, __taxonomyFile=None, __processedF
                 # headerFinal = f'>{taxId}.SeC-{j}.{organismName.replace(" ", "_")}'
                 # headerFinal = f'>{taxon}.{organismName.replace(" ", "_")}.{taxId}.{j}'
                 # headerFinal = f'>{taxId}.{j}'
-                headerFinal = f'>{i}'
+                headerFinal = f'>{index}'
 
                 metadataInfos[headerFinal[1:]] = {'taxonomy': taxonomyInfos[organismName]['taxonomy'], 'tax-id': taxId, 'trna-number': j}
                 processedInfos[f'{organismName}.{j}'] = {'info': detectedInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
 
                 tRNAs += 1
+                index += 1
             count += 1
         except KeyboardInterrupt:
             shellDetected.close()
