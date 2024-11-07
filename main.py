@@ -50,6 +50,7 @@ parser.add_argument('--detected-file', help='The name for the default detected f
 parser.add_argument('--processed-file', help='The name for the default processed file information.')
 parser.add_argument('--align-file', help='The name for the default alignment file.')
 parser.add_argument('--taxonomy-file', help='The name for the default taxonomy file.')
+parser.add_argument('--metadata-file', help='The name for the default metadata file.')
 
 parser.add_argument('--taxon-names', help='The names of the taxons to be analysed.')
 parser.add_argument('--taxon-level', help='The level of the taxon to be analysed.')
@@ -79,6 +80,8 @@ parser.add_argument('-SP', '--suppress-preprocess', help='Suppress preprocess.',
 parser.add_argument('-SPh', '--suppress-taxonomy', help='Suppress taxonomy process.', action='store_false')
 parser.add_argument('-SPA', '--suppress-taxana', help='Suppress taxonomy analysis process.', action='store_false')
 parser.add_argument('-SRRS', '--suppress-rRNAs', help='Suppress rRNAsmallsubunit collection.', action='store_false')
+parser.add_argument('-SAl', '--suppress-align', help='Suppress MAFFT alignment.', action='store_false')
+parser.add_argument('-SM', '--suppress-metadata', help='Suppress metadata process.', action='store_false')
 
 args=parser.parse_args()
 
@@ -91,6 +94,7 @@ detectedFile = args.detected_file if args.detected_file != None else 'detected'
 processedFile = args.processed_file if args.processed_file != None else 'processed'
 alignFile = args.align_file if args.align_file != None else 'align'
 taxonomyFile = args.taxonomy_file if args.taxonomy_file != None else 'taxonomy'
+metadataFile = args.metadata_file if args.metadata_file != None else 'metadata'
 
 taxonNames = eval(args.taxon_names) if args.taxon_names != None else __taxonNames
 taxonLevel = args.taxon_level if args.taxon_level != None else 'all'
@@ -130,6 +134,8 @@ suppressPreprocess = args.suppress_preprocess
 suppressTaxonomy = args.suppress_taxonomy
 suppressTaxonAnalysis = args.suppress_taxana
 suppressRRS = args.suppress_rRNAs
+suppressAlign = args.suppress_align
+suppressMetadata = args.suppress_metadata
 
 
 
@@ -145,6 +151,7 @@ files = {
     '__processedFile': processedFile + suffix,
     '__alignFile': alignFile,
     '__taxonomyFile': taxonomyFile,
+    '__metadataFile': metadataFile,
 
     'suppressDownload': not suppressDownload,
     'suppressFetch': not suppressFetch,
@@ -160,10 +167,10 @@ if suppressDownload: downloadGenomes(species, sizeLimit=20, referenceRange=refer
 if suppressFetch: downloadFetch(verbose=verboseFetch)
 if suppressScan: trnaScanSE(verbose=verboseScan)
 if suppressDetected: findDetectedSeC(verbose=verboseDetected)
-if suppressPreprocess: preprocessSeC(verbose=verbosePreprocess, debug=0)
 if suppressTaxonomy: taxonCollection(verbose=verboseTaxonomy)
+if suppressPreprocess: preprocessSeC(verbose=verbosePreprocess, debug=0)
 if suppressTaxonAnalysis: taxonAnalysis(taxonLevel, verbose=verboseTaxonAnalysis, sequential=sequentialAnalysis, debug=0)
 # if suppressRRS: collectRRS(verbose=verboseRRS)
 
-if referenceRange == None:
+if ((referenceRange == None) and (suppressAlign)):
     alignMAFFT()

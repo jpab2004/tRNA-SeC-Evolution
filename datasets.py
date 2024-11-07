@@ -3,6 +3,7 @@ from collections import defaultdict, deque
 from termcolor import colored
 import os, sys, glob, ast
 from json import dumps
+import random
 
 
 
@@ -54,7 +55,11 @@ createdAlignFile = False
 globalTaxonomyFile = None
 createdTaxonomyFile = False
 
+globalMetadataFile = None
+createdMetadataFile = False
+
 globalTRNACount = None
+globalMetadataColors = None
 
 globalTaxonLevels = ['superkingdom', 'kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']
 globalTaxonLevelsCheat = {
@@ -77,6 +82,14 @@ globalTaxonLevelsSequence = {
     'genus': ['superkingdom', 'kingdom', 'phylum', 'class', 'order', 'family', 'genus'],
     'species': ['superkingdom', 'kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species'],
 }
+
+
+
+def randomColor(num=1):
+    alpha = '0123456789ABCDEF'
+    if num > 1:
+        return [('#' + ''.join([random.choice(alpha) for _ in range(6)])) for _ in range(num)]
+    return '#' + ''.join([random.choice(alpha) for _ in range(6)])
 
 
 
@@ -125,7 +138,7 @@ def pathCheckCreation(path, returnPath=False, create=True):
 
 
 
-# Creation of the Genomes path
+# Creation of files
 def createGenomesPath(__genomesPath='Genomes/', suppress=False):
     global globalGenomesPath, createdGenomesPath
 
@@ -183,6 +196,14 @@ def createTaxonomyFile(__taxonomyFile='taxonomy', suppress=False):
 
     globalTaxonomyFile = os.popen(f'readlink -f {__taxonomyFile}.data').read()[:-1]
 
+def createMetadataFile(__metadataFile='metadata', suppress=False):
+    global globalMetadataFile, createdMetadataFile
+    
+    if not suppress: os.system(f'> {__metadataFile}.csv')
+    createdMetadataFile = True
+
+    globalMetadataFile = os.popen(f'readlink -f {__metadataFile}.csv').read()[:-1]
+
 def initiate(
         __genomesPath='Genomes/',
         __fetchFile='fetch',
@@ -191,6 +212,7 @@ def initiate(
         __processedFile='processed',
         __alignFile='align',
         __taxonomyFile='taxonomy',
+        __metadataFile='metadata',
         
         suppressDownload=False,
         suppressFetch=False,
@@ -205,6 +227,7 @@ def initiate(
     createProcessedFile(__processedFile, suppress=suppressPreprocess)
     createAlignFile(__alignFile)
     createTaxonomyFile(__taxonomyFile, suppress=suppressTaxonomy)
+    createMetadataFile(__metadataFile, suppress=suppressPreprocess)
 
     return
 
@@ -315,6 +338,23 @@ def addToTaxonomyFile(taxonInfos, __taxonomyFile=None):
 
             command = ' | '.join(commandParts)
             fileHandler.write(f'{accession} > {name} > {taxId} > {popularName} > {chromosomesFolderPath} > {command}\n')
+
+def addToMetadataFile(metadataInfos, __metadataFile=None):
+    if __metadataFile == None:
+        global globalMetadataFile
+        metadataFile = globalMetadataFile
+    else:
+        metadataFile = __metadataFile
+
+    if not createdMetadataFile:
+        createMetadataFile()
+
+    with open(metadataFile, 'a') as fileHandler:
+        fileHandler.write('id;taxon\n')
+        for identification in metadataInfos:
+            taxon = metadataInfos[identification]['taxon']
+
+            fileHandler.write(f'{identification};{taxon}\n')
 
 
 
@@ -1081,154 +1121,6 @@ def findDetectedSeC(__readyFile=None, __detectedFile=None, verbose=1):
 
 
 
-def preprocessSeC(__detectedFile=None, __taxonomyFile=None, __processedFile=None, verbose=1, debug=1):
-    global globalTRNACount, globalTaxonLevels
-
-    if __detectedFile == None:
-        global globalDetectedFile
-        detectedFile = globalDetectedFile
-    else:
-        detectedFile = __detectedFile
-
-    if __taxonomyFile == None:
-        global globalTaxonomyFile
-        taxonomyFile = globalTaxonomyFile
-    else:
-        taxonomyFile = __taxonomyFile
-
-    with open(detectedFile, 'r') as fileHandler:
-        detectedLines = fileHandler.readlines()
-
-    with open(taxonomyFile, 'r') as fileHandler:
-        taxonLines = fileHandler.readlines()
-    
-    detectedInfos = {}
-    for info in detectedLines:
-        splitted = info.strip('\n').split(' > ')
-        popularName = splitted[3] if splitted[3] != 'None' else None
-
-        detectedInfos[splitted[1]] = {
-            'accession': splitted[0],
-            'tax-id': splitted[2],
-            'popular-name': popularName,
-            'chromosomes-folder': splitted[4],
-            'kingdom': splitted[5]
-        }
-    
-    taxonInfos = {}
-    for info in taxonLines:
-        splitted = info.strip('\n').split(' > ')
-        popularName = splitted[3] if splitted[3] != 'None' else None
-        taxonomy = splitted[5].split(' | ')
-
-        taxonInfos[splitted[1]] = {
-            'accession': splitted[0],
-            'tax-id': splitted[2],
-            'popular-name': popularName,
-            'chromosomes-folder': splitted[4]
-        }
-    
-        taxonInfos[splitted[1]]['taxonomy'] = {}
-        for __taxonInfo in taxonomy:
-            __taxonLevel, __taxonName, __taxonId = __taxonInfo.split('<')
-            taxonInfos[splitted[1]]['taxonomy'][__taxonLevel] = __taxonName
-            taxonInfos[splitted[1]]['taxonomy'][f'{__taxonLevel}-id'] = __taxonId
-
-    count = 0
-    tRNAs = 0
-    skipped = 0
-    processedInfos = {}
-
-    print(f'{tabulation}{magenta(f"Preprocessing tRNAs-SeC starting" + " | " + numberP(len(detectedLines)) + magenta(" genomes")):^140}\n')
-    totalIndexing = len(list(detectedInfos.keys()))
-    indexingSize = len(str(totalIndexing))
-    for i, organismName in enumerate(detectedInfos, 1):
-        chromosomesFolder = detectedInfos[organismName]['chromosomes-folder']
-        popularName = detectedInfos[organismName]['popular-name']
-        accession = detectedInfos[organismName]['accession']
-        taxId = detectedInfos[organismName]['tax-id']
-        name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + cyan(f' ({popularName} - {accession}/{taxId})' if popularName != None else f' ({accession}/{taxId})')
-
-        for __level in globalTaxonLevels:
-            if __level in taxonInfos[organismName]['taxonomy']:
-                taxon = taxonInfos[organismName]['taxonomy'][__level]
-                break
-
-        if (verbose):            
-            print(f'{tabulation}{yellow(name)}:')
-        
-        try:
-            os.chdir(chromosomesFolder)
-            if verbose:
-                ps(green('Chromosomes folder found'))
-                pe(cyan('Attempting extraction'))
-        except:
-            if verbose:
-                ps(red('Could not find chromosomes folder!'))
-                pe(cyan('Skipping organism'))
-                print()
-
-            skipped += 1
-            continue
-
-        try:
-            shellDetected = os.popen(f'cat *.hits | grep "SeC" -A 2')
-            detectedTRNAs = shellDetected.read()[:-1].replace('--\n', '').split('>')[1:]
-            shellDetected.close()
-
-            if debug:
-                print(detectedTRNAs, end='\n\n')
-
-            for j, aux in enumerate(detectedTRNAs, 1):
-                part = aux.split('\n')
-                headerInfos = part[0].split(' ')
-                tRNASequence = ''.join(part[1:])
-
-                if tRNASequence == '':
-                    continue
-
-                if debug:
-                    print(headerInfos, tRNASequence, sep='\n')
-
-                chromosomeState, chromosomeNumber, tRNANumber = headerInfos[0][1:].split('.')
-                chromosomePosition = headerInfos[1].split(':')[1]
-                strand, size, score = headerInfos[2], headerInfos[5], headerInfos[8]
-
-                # headerFinal = f'''
-                #     >{taxon}.{organismName.replace(" ", "_")}.{tRNANumber} | 
-                #     {taxon}_{chromosomeState}.{chromosomeNumber}:{chromosomePosition} | 
-                #     {strand}_{size}_{score}
-                # '''.replace('\n                    ', '').replace('\n', '')
-                # headerFinal = f'>{taxon}.SeC-{j}.{organismName.replace(".", " ").replace(" ", "_")}'
-                # headerFinal = f'>{taxId}.SeC-{j}.{organismName.replace(" ", "_")}'
-                headerFinal = f'>{taxon}.{organismName.replace(" ", "_")}.{taxId}.{j}'
-
-                processedInfos[f'{organismName}.{j}'] = {'info': detectedInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
-                tRNAs += 1
-            count += 1
-        except KeyboardInterrupt:
-            shellDetected.close()
-            sys.exit()
-        except Exception as e:
-            shellDetected.close()
-            print(tabulation + red('ERROR:') + str(e))
-            sys.exit()
-
-        if verbose:
-            print(f'{tabulation}{red("Processing finished")}')
-            print()
-
-    addToProcessedFile(processedInfos, __processedFile)
-    globalTRNACount = tRNAs
-
-    print(
-        f'{tabulation}{magenta("tRNAs-SeC preprocessing ended | ") + numberP(count) + magenta(" genomes processed (") + numberP(tRNAs) + magenta(" tRNAs-SeC) & ") +
-        numberP(skipped) + magenta(" skipped"):^175}'
-    )
-    separator()
-
-
-
 def taxonCollection(__readyFile=None, __taxonomyFile=None, verbose=1):
     global globalTaxonLevels
 
@@ -1398,6 +1290,168 @@ def taxonCollection(__readyFile=None, __taxonomyFile=None, verbose=1):
     print(
         f'{tabulation}{magenta(f"Taxonomy collection finished | ") + numberP(count) + magenta(" genomes processed, ") + numberP(found) + magenta(" found & ")
         + numberP(skipped) + magenta(" skipped"):^175}'
+    )
+    separator()
+
+
+
+def preprocessSeC(__detectedFile=None, __taxonomyFile=None, __processedFile=None, __metadataFile=None, verbose=1, debug=1):
+    global globalTRNACount, globalTaxonLevels
+
+
+
+    if __detectedFile == None:
+        global globalDetectedFile
+        detectedFile = globalDetectedFile
+    else:
+        detectedFile = __detectedFile
+
+    if __taxonomyFile == None:
+        global globalTaxonomyFile
+        taxonomyFile = globalTaxonomyFile
+    else:
+        taxonomyFile = __taxonomyFile
+
+
+
+    with open(detectedFile, 'r') as fileHandler:
+        detectedLines = fileHandler.readlines()
+
+    with open(taxonomyFile, 'r') as fileHandler:
+        taxonLines = fileHandler.readlines()
+    
+
+
+    detectedInfos = {}
+    for info in detectedLines:
+        splitted = info.strip('\n').split(' > ')
+        popularName = splitted[3] if splitted[3] != 'None' else None
+
+        detectedInfos[splitted[1]] = {
+            'accession': splitted[0],
+            'tax-id': splitted[2],
+            'popular-name': popularName,
+            'chromosomes-folder': splitted[4],
+            'kingdom': splitted[5]
+        }
+    
+    taxonInfos = {}
+    for info in taxonLines:
+        splitted = info.strip('\n').split(' > ')
+        popularName = splitted[3] if splitted[3] != 'None' else None
+        taxonomy = splitted[5].split(' | ')
+
+        taxonInfos[splitted[1]] = {
+            'accession': splitted[0],
+            'tax-id': splitted[2],
+            'popular-name': popularName,
+            'chromosomes-folder': splitted[4]
+        }
+    
+        taxonInfos[splitted[1]]['taxonomy'] = {}
+        for __taxonInfo in taxonomy:
+            __taxonLevel, __taxonName, __taxonId = __taxonInfo.split('<')
+            taxonInfos[splitted[1]]['taxonomy'][__taxonLevel] = __taxonName
+            taxonInfos[splitted[1]]['taxonomy'][f'{__taxonLevel}-id'] = __taxonId
+
+
+
+    count = 0
+    tRNAs = 0
+    skipped = 0
+    processedInfos = {}
+    metadataInfos = {}
+
+
+
+    print(f'{tabulation}{magenta(f"Preprocessing tRNAs-SeC starting" + " | " + numberP(len(detectedLines)) + magenta(" genomes")):^140}\n')
+    totalIndexing = len(list(detectedInfos.keys()))
+    indexingSize = len(str(totalIndexing))
+    for i, organismName in enumerate(detectedInfos, 1):
+        chromosomesFolder = detectedInfos[organismName]['chromosomes-folder']
+        popularName = detectedInfos[organismName]['popular-name']
+        accession = detectedInfos[organismName]['accession']
+        taxId = detectedInfos[organismName]['tax-id']
+        name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + cyan(f' ({popularName} - {accession}/{taxId})' if popularName != None else f' ({accession}/{taxId})')
+
+        for __level in globalTaxonLevels:
+            if __level in taxonInfos[organismName]['taxonomy']:
+                taxon = taxonInfos[organismName]['taxonomy'][__level]
+                break
+
+        if (verbose):            
+            print(f'{tabulation}{yellow(name)}:')
+        
+        try:
+            os.chdir(chromosomesFolder)
+            if verbose:
+                ps(green('Chromosomes folder found'))
+                pe(cyan('Attempting extraction'))
+        except:
+            if verbose:
+                ps(red('Could not find chromosomes folder!'))
+                pe(cyan('Skipping organism'))
+                print()
+
+            skipped += 1
+            continue
+
+        try:
+            shellDetected = os.popen(f'cat *.hits | grep "SeC" -A 2')
+            detectedTRNAs = shellDetected.read()[:-1].replace('--\n', '').split('>')[1:]
+            shellDetected.close()
+
+            if debug:
+                print(detectedTRNAs, end='\n\n')
+
+            for j, aux in enumerate(detectedTRNAs, 1):
+                part = aux.split('\n')
+                headerInfos = part[0].split(' ')
+                tRNASequence = ''.join(part[1:])
+
+                if tRNASequence == '':
+                    continue
+
+                if debug:
+                    print(headerInfos, tRNASequence, sep='\n')
+
+                chromosomeState, chromosomeNumber, tRNANumber = headerInfos[0][1:].split('.')
+                chromosomePosition = headerInfos[1].split(':')[1]
+                strand, size, score = headerInfos[2], headerInfos[5], headerInfos[8]
+
+                # headerFinal = f'''
+                #     >{taxon}.{organismName.replace(" ", "_")}.{tRNANumber} | 
+                #     {taxon}_{chromosomeState}.{chromosomeNumber}:{chromosomePosition} | 
+                #     {strand}_{size}_{score}
+                # '''.replace('\n                    ', '').replace('\n', '')
+                # headerFinal = f'>{taxon}.SeC-{j}.{organismName.replace(".", " ").replace(" ", "_")}'
+                # headerFinal = f'>{taxId}.SeC-{j}.{organismName.replace(" ", "_")}'
+                # headerFinal = f'>{taxon}.{organismName.replace(" ", "_")}.{taxId}.{j}'
+                headerFinal = f'>{taxId}.{j}'
+
+                metadataInfos[headerFinal[1:]] = {'taxon': taxon}
+                processedInfos[f'{organismName}.{j}'] = {'info': detectedInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
+                tRNAs += 1
+            count += 1
+        except KeyboardInterrupt:
+            shellDetected.close()
+            sys.exit()
+        except Exception as e:
+            shellDetected.close()
+            print(tabulation + red('ERROR:') + str(e))
+            sys.exit()
+
+        if verbose:
+            print(f'{tabulation}{red("Processing finished")}')
+            print()
+
+    addToProcessedFile(processedInfos, __processedFile)
+    addToMetadataFile(metadataInfos, __metadataFile)
+    globalTRNACount = tRNAs
+
+    print(
+        f'{tabulation}{magenta("tRNAs-SeC preprocessing ended | ") + numberP(count) + magenta(" genomes processed (") + numberP(tRNAs) + magenta(" tRNAs-SeC) & ") +
+        numberP(skipped) + magenta(" skipped"):^175}'
     )
     separator()
 
