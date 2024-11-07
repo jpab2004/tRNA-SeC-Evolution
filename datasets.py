@@ -1603,7 +1603,7 @@ def taxonAnalysis(__level='all', __taxonomyFile=None, __detectedFile=None, verbo
         percentage = f'{100 * (found / total):.2f}%'
         taxonAnalysis[level]['percentage'] = percentage
 
-    if debug:
+    if ((debug) or (__level != 'all')):
         pretty(taxonAnalysis)
         if verbose:
             print()
