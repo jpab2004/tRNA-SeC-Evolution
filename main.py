@@ -65,6 +65,7 @@ parser.add_argument('--range-step', help='The step of the range.')
 
 parser.add_argument('--re-download', help='Force re download of genomes.', action='store_true')
 parser.add_argument('--refseq', help='Use RefSeq expanded search.', action='store_true')
+parser.add_argument('--all-scores', help='Use all the tRNA-SeC, independent of score search.', action='store_false')
 
 parser.add_argument('--quiet', help='Quiet printing.', action='store_false')
 parser.add_argument('-QD', '--q-download', help='Quiet for download.', action='store_false')
@@ -92,7 +93,7 @@ args=parser.parse_args()
 
 
 genomesPath = args.genomes_path if args.genomes_path != None else 'GenomesArchaeaExpanded/'
-speciesFile = args.species_file if args.species_file != None else 'species.pickle'
+speciesFile = args.species_file if args.species_file != None else 'species'
 fetchFile = args.fetch_file if args.fetch_file != None else 'fetch'
 readyFile = args.ready_file if args.ready_file != None else 'ready'
 detectedFile = args.detected_file if args.detected_file != None else 'detected'
@@ -113,6 +114,7 @@ rangeStep = int(args.range_step) if args.range_step != None else 1
 
 reDownload = args.re_download
 refseq = args.refseq
+highestScore = args.all_scores
 
 quiet = args.quiet
 if not quiet:
@@ -151,15 +153,19 @@ suffix = ''
 if referenceRange != None:
     suffix = f'_{referenceRange}*{rangeStep}'
 
+suffixScore = ''
+if not highestScore:
+    suffixScore = '_all_scores'
+
 files = {
     '__genomesPath': genomesPath,
     '__fetchFile': fetchFile + suffix,
     '__readyFile': readyFile + suffix,
     '__detectedFile': detectedFile + suffix,
-    '__processedFile': processedFile + suffix,
-    '__alignFile': alignFile,
+    '__processedFile': processedFile + suffix + suffixScore,
+    '__alignFile': alignFile + suffixScore,
     '__taxonomyFile': taxonomyFile,
-    '__metadataFile': metadataFile,
+    '__metadataFile': metadataFile + suffixScore,
 
     'suppressDownload': not suppressDownload,
     'suppressFetch': not suppressFetch,
@@ -177,7 +183,7 @@ if suppressFetch: downloadFetch(verbose=verboseFetch)
 if suppressScan: trnaScanSE(verbose=verboseScan)
 if suppressDetected: findDetectedSeC(verbose=verboseDetected)
 if suppressTaxonomy: taxonCollection(verbose=verboseTaxonomy)
-if suppressPreprocess: preprocessAndMetadata(verbose=verbosePreprocess, debug=0)
+if suppressPreprocess: preprocessAndMetadata(highestScore=highestScore, verbose=verbosePreprocess, debug=0)
 if suppressTaxonAnalysis: taxonAnalysis(taxonLevel, verbose=verboseTaxonAnalysis, sequential=sequentialAnalysis, debug=0)
 # if suppressRRS: collectRRS(verbose=verboseRRS)
 

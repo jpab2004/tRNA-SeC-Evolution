@@ -37,7 +37,7 @@ pmTaxa = lambda x: print(f'{x} -> ', end='', flush=True)
 globalGenomesPath = None
 createdGenomesPath = False
 
-globalSpeciesFile = 'species.pickle'
+globalSpeciesFile = 'species'
 
 globalFetchFile = None
 createdFetchFile = False
@@ -356,11 +356,12 @@ def addToMetadataFile(metadataInfos, __metadataFile=None):
 
     with open(metadataFile, 'a') as fileHandler:
         taxonsTextGeneral = ';'.join(globalTaxonLevels)
-        firstLine = f'ID;taxID;tRNA-SeC number;{taxonsTextGeneral}\n'
+        firstLine = f'ID;taxID;tRNA-SeC number;score;{taxonsTextGeneral}\n'
         fileHandler.write(firstLine)
         for identification in metadataInfos:
             taxId = metadataInfos[identification]['tax-id']
             taxonomy = metadataInfos[identification]['taxonomy']
+            score = metadataInfos[identification]['score']
             tRNANumber = metadataInfos[identification]['trna-number']
 
             taxons = []
@@ -368,7 +369,7 @@ def addToMetadataFile(metadataInfos, __metadataFile=None):
                 taxons.append(taxonomy[__level] if __level in taxonomy else str(None))
             taxonsText = ';'.join(taxons)
 
-            text = f'{identification};{taxId};{tRNANumber};{taxonsText}\n'
+            text = f'{identification};{taxId};{tRNANumber};{score};{taxonsText}\n'
 
             fileHandler.write(text)
 
@@ -398,9 +399,9 @@ def collectInfo(taxons, verbose=1, archaea=0, save=0, read=0, __speciesFile=None
 
     if __speciesFile == None:
         global globalSpeciesFile
-        speciesFile = globalSpeciesFile
+        speciesFile = globalSpeciesFile + '.pickle'
     else:
-        speciesFile = __speciesFile
+        speciesFile = __speciesFile + '.pickle'
 
     separator()
     print(f'{tabulation}{magenta("Data collection starting"):^120}\n')
@@ -1327,7 +1328,7 @@ def taxonCollection(__readyFile=None, __taxonomyFile=None, verbose=1):
 
 
 
-def preprocessAndMetadata(__detectedFile=None, __taxonomyFile=None, __processedFile=None, __metadataFile=None, verbose=1, debug=1):
+def preprocessAndMetadata(__detectedFile=None, __taxonomyFile=None, __processedFile=None, __metadataFile=None, highestScore=1, verbose=1, debug=1):
     global globalTRNACount, globalTaxonLevels
 
 
@@ -1432,37 +1433,54 @@ def preprocessAndMetadata(__detectedFile=None, __taxonomyFile=None, __processedF
             if debug:
                 print(detectedTRNAs, end='\n\n')
 
-            for j, aux in enumerate(detectedTRNAs, 1):
-                part = aux.split('\n')
-                headerInfos = part[0].split(' ')
-                tRNASequence = ''.join(part[1:])
+            if highestScore:
+                hScore = 0
 
-                if tRNASequence == '':
-                    continue
+                for j, aux in enumerate(detectedTRNAs, 1):
+                    part = aux.split('\n')
+                    headerInfos = part[0].split(' ')
+                    tRNASequence = ''.join(part[1:])
 
-                if debug:
-                    print(headerInfos, tRNASequence, sep='\n')
+                    if tRNASequence == '':
+                        continue
 
-                chromosomeState, chromosomeNumber, tRNANumber = headerInfos[0][1:].split('.')
-                chromosomePosition = headerInfos[1].split(':')[1]
-                strand, size, score = headerInfos[2], headerInfos[5], headerInfos[8]
+                    if debug:
+                        print(headerInfos, tRNASequence, sep='\n')
 
-                # headerFinal = f'''
-                #     >{taxon}.{organismName.replace(" ", "_")}.{tRNANumber} | 
-                #     {taxon}_{chromosomeState}.{chromosomeNumber}:{chromosomePosition} | 
-                #     {strand}_{size}_{score}
-                # '''.replace('\n                    ', '').replace('\n', '')
-                # headerFinal = f'>{taxon}.SeC-{j}.{organismName.replace(".", " ").replace(" ", "_")}'
-                # headerFinal = f'>{taxId}.SeC-{j}.{organismName.replace(" ", "_")}'
-                # headerFinal = f'>{taxon}.{organismName.replace(" ", "_")}.{taxId}.{j}'
-                # headerFinal = f'>{taxId}.{j}'
-                headerFinal = f'>{index}'
+                    chromosomeState, chromosomeNumber, tRNANumber = headerInfos[0][1:].split('.')
+                    chromosomePosition = headerInfos[1].split(':')[1]
+                    strand, size, score = headerInfos[2], headerInfos[5], float(headerInfos[8])
 
-                metadataInfos[headerFinal[1:]] = {'taxonomy': taxonomyInfos[organismName]['taxonomy'], 'tax-id': taxId, 'trna-number': j}
-                processedInfos[f'{organismName}.{j}'] = {'info': detectedInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
+                    if score > hScore:
+                        hScore = score
+                        headerFinal = f'>{index}'
+                        metadataInfos[headerFinal[1:]] = {'taxonomy': taxonomyInfos[organismName]['taxonomy'], 'tax-id': taxId, 'trna-number': j, 'score': score}
+                        processedInfos[organismName] = {'info': detectedInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
 
                 tRNAs += 1
                 index += 1
+            else:
+                for j, aux in enumerate(detectedTRNAs, 1):
+                    part = aux.split('\n')
+                    headerInfos = part[0].split(' ')
+                    tRNASequence = ''.join(part[1:])
+
+                    if tRNASequence == '':
+                        continue
+
+                    if debug:
+                        print(headerInfos, tRNASequence, sep='\n')
+
+                    chromosomeState, chromosomeNumber, tRNANumber = headerInfos[0][1:].split('.')
+                    chromosomePosition = headerInfos[1].split(':')[1]
+                    strand, size, score = headerInfos[2], headerInfos[5], headerInfos[8]
+
+                    headerFinal = f'>{index}'
+                    metadataInfos[headerFinal[1:]] = {'taxonomy': taxonomyInfos[organismName]['taxonomy'], 'tax-id': taxId, 'trna-number': j}
+                    processedInfos[f'{organismName}.{j}'] = {'info': detectedInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
+
+                    tRNAs += 1
+                    index += 1
             count += 1
         except KeyboardInterrupt:
             shellDetected.close()
