@@ -31,6 +31,24 @@ peT = lambda x: print(x)
 psTaxa = lambda: print(tabulation, end='', flush=True)
 pmTaxa = lambda x: print(f'{x} -> ', end='', flush=True)
 
+randomColor = lambda: '#' + ''.join([random.choice('0123456789ABCDEF') for _ in range(6)])
+
+
+
+HH, hh = 'FF', 'BB'
+
+noneTaxon = f'#{HH}0000'
+redTaxon = f'#{HH}{hh}{hh}'
+greenTaxon = f'#{hh}{HH}{hh}'
+blueTaxon = f'#{hh}{hh}{HH}'
+
+globalTaxonColors = defaultdict(lambda: defaultdict(lambda: None))
+globalTaxonColors['None'] = noneTaxon
+
+globalTaxonColors['superkingdom']['Bacteria'] = redTaxon
+globalTaxonColors['superkingdom']['Archaea'] = greenTaxon
+globalTaxonColors['superkingdom']['Eukaryota'] = blueTaxon
+
 
 
 # Consts
@@ -84,14 +102,6 @@ globalTaxonLevelsSequence = {
     'genus': ['superkingdom', 'kingdom', 'phylum', 'class', 'order', 'family', 'genus'],
     'species': ['superkingdom', 'kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species'],
 }
-
-
-
-def randomColor(num=1):
-    alpha = '0123456789ABCDEF'
-    if num > 1:
-        return [('#' + ''.join([random.choice(alpha) for _ in range(6)])) for _ in range(num)]
-    return '#' + ''.join([random.choice(alpha) for _ in range(6)])
 
 
 
@@ -343,7 +353,11 @@ def addToTaxonomyFile(taxonInfos, __taxonomyFile=None):
             fileHandler.write(f'{accession} > {name} > {taxId} > {popularName} > {chromosomesFolderPath} > {command}\n')
 
 def addToMetadataFile(metadataInfos, __metadataFile=None):
-    global globalTaxonLevels
+    global globalTaxonLevels, globalTaxonColors
+    
+    coloredTaxons = ['superkingdom', 'kingdom', 'phylum']
+    taxonsTextGeneral = ';'.join(globalTaxonLevels)
+    coloredTaxonsTextGeneral = ';'.join([f'{cTaxon}__color' for cTaxon in coloredTaxons])
 
     if __metadataFile == None:
         global globalMetadataFile
@@ -355,9 +369,9 @@ def addToMetadataFile(metadataInfos, __metadataFile=None):
         createMetadataFile()
 
     with open(metadataFile, 'a') as fileHandler:
-        taxonsTextGeneral = ';'.join(globalTaxonLevels)
-        firstLine = f'ID;taxID;tRNA-SeC number;score;{taxonsTextGeneral}\n'
+        firstLine = f'ID;taxID;tRNA-SeC number;score;{taxonsTextGeneral};{coloredTaxonsTextGeneral}\n'
         fileHandler.write(firstLine)
+
         for identification in metadataInfos:
             taxId = metadataInfos[identification]['tax-id']
             taxonomy = metadataInfos[identification]['taxonomy']
@@ -369,7 +383,20 @@ def addToMetadataFile(metadataInfos, __metadataFile=None):
                 taxons.append(taxonomy[__level] if __level in taxonomy else str(None))
             taxonsText = ';'.join(taxons)
 
-            text = f'{identification};{taxId};{tRNANumber};{score};{taxonsText}\n'
+            taxonsColors = []
+            for superLevel in coloredTaxons:
+                if superLevel in taxonomy:
+                    if not taxonomy[superLevel] in globalTaxonColors[superLevel]:
+                        globalTaxonColors[superLevel][taxonomy[superLevel]] = randomColor()
+                    colorToAppend = globalTaxonColors[superLevel][taxonomy[superLevel]]
+                else:
+                    colorToAppend = globalTaxonColors['None']
+                
+                taxonsColors.append(colorToAppend)
+
+            taxonsColorText = ';'.join(taxonsColors)
+
+            text = f'{identification};{taxId};{tRNANumber};{score};{taxonsText};{taxonsColorText}\n'
 
             fileHandler.write(text)
 
