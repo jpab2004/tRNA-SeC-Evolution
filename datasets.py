@@ -1234,7 +1234,7 @@ def findDetectedSeC(__readyFile=None, __detectedFile=None, verbose=1):
 
 
 
-def taxonCollection(__readyFile=None, __taxonomyFile=None, verbose=1):
+def taxonomyCollection(__readyFile=None, __taxonomyFile=None, verbose=1):
     global globalTaxonLevels
 
     if __readyFile == None:

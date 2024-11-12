@@ -1,4 +1,4 @@
-from datasets import collectInfo, downloadGenomes, downloadFetch, trnaScanSE, findDetectedSeC, processAndMetadata, alignMAFFT, taxonCollection, taxonAnalysis, collectRSSU
+from datasets import collectInfo, downloadGenomes, downloadFetch, trnaScanSE, findDetectedSeC, processAndMetadata, alignMAFFT, taxonomyCollection, taxonAnalysis, collectRSSU
 from datasets import initiate, pretty
 import os, argparse, sys
 
@@ -182,7 +182,7 @@ if suppressDownload: downloadGenomes(species, sizeLimit=20, referenceRange=refer
 if suppressFetch: downloadFetch(verbose=verboseFetch)
 if suppressScan: trnaScanSE(verbose=verboseScan)
 if suppressDetected: findDetectedSeC(verbose=verboseDetected)
-if suppressTaxonomy: taxonCollection(verbose=verboseTaxonomy)
+if suppressTaxonomy: taxonomyCollection(verbose=verboseTaxonomy)
 if suppressRRS: collectRSSU(verbose=verboseRRS)
 if suppressPreprocess: processAndMetadata(highestScore=highestScore, verbose=verbosePreprocess, debug=0)
 if suppressTaxonAnalysis: taxonAnalysis(taxonLevel, verbose=verboseTaxonAnalysis, sequential=sequentialAnalysis, debug=0)
