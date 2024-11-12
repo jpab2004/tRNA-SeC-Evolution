@@ -1,4 +1,4 @@
-from datasets import collectInfo, downloadGenomes, downloadFetch, trnaScanSE, findDetectedSeC, preprocessAndMetadata, alignMAFFT, taxonCollection, taxonAnalysis, collectRRS
+from datasets import collectInfo, downloadGenomes, downloadFetch, trnaScanSE, findDetectedSeC, processAndMetadata, alignMAFFT, taxonCollection, taxonAnalysis, collectRSSU
 from datasets import initiate, pretty
 import os, argparse, sys
 
@@ -84,7 +84,7 @@ parser.add_argument('-SDe', '--suppress-detected', help='Suppress detected proce
 parser.add_argument('-SP', '--suppress-preprocess', help='Suppress preprocess.', action='store_false')
 parser.add_argument('-SPh', '--suppress-taxonomy', help='Suppress taxonomy process.', action='store_false')
 parser.add_argument('-SPA', '--suppress-taxana', help='Suppress taxonomy analysis process.', action='store_false')
-parser.add_argument('-SRRS', '--suppress-rRNAs', help='Suppress rRNAsmallsubunit collection.', action='store_false')
+parser.add_argument('-SRSS', '--suppress-rRNAs', help='Suppress rRNAsmallsubunit collection.', action='store_false')
 parser.add_argument('-SAl', '--suppress-align', help='Suppress MAFFT alignment.', action='store_false')
 parser.add_argument('-SM', '--suppress-metadata', help='Suppress metadata process.', action='store_false')
 
@@ -183,9 +183,9 @@ if suppressFetch: downloadFetch(verbose=verboseFetch)
 if suppressScan: trnaScanSE(verbose=verboseScan)
 if suppressDetected: findDetectedSeC(verbose=verboseDetected)
 if suppressTaxonomy: taxonCollection(verbose=verboseTaxonomy)
-if suppressPreprocess: preprocessAndMetadata(highestScore=highestScore, verbose=verbosePreprocess, debug=0)
+if suppressRRS: collectRSSU(verbose=verboseRRS)
+if suppressPreprocess: processAndMetadata(highestScore=highestScore, verbose=verbosePreprocess, debug=0)
 if suppressTaxonAnalysis: taxonAnalysis(taxonLevel, verbose=verboseTaxonAnalysis, sequential=sequentialAnalysis, debug=0)
-# if suppressRRS: collectRRS(verbose=verboseRRS)
 
 if ((referenceRange == None) and (suppressAlign)):
     alignMAFFT()

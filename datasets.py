@@ -32,22 +32,51 @@ psTaxa = lambda: print(tabulation, end='', flush=True)
 pmTaxa = lambda x: print(f'{x} -> ', end='', flush=True)
 
 randomColor = lambda: '#' + ''.join([random.choice('0123456789ABCDEF') for _ in range(6)])
+randomShape = lambda: random.choice(allAvailableShapes)
 
 
 
+# Microreact colors
 HH, hh = 'FF', 'BB'
 
-noneTaxon = f'#{HH}0000'
-redTaxon = f'#{HH}{hh}{hh}'
-greenTaxon = f'#{hh}{HH}{hh}'
-blueTaxon = f'#{hh}{hh}{HH}'
+colorNone = f'#{hh}{hh}{hh}'
+colorRed = f'#{HH}{hh}{hh}'
+colorGreen = f'#{hh}{HH}{hh}'
+colorBlue = f'#{hh}{hh}{HH}'
 
 globalTaxonColors = defaultdict(lambda: defaultdict(lambda: None))
-globalTaxonColors['None'] = noneTaxon
+globalTaxonColors['None'] = colorNone
 
-globalTaxonColors['superkingdom']['Bacteria'] = redTaxon
-globalTaxonColors['superkingdom']['Archaea'] = greenTaxon
-globalTaxonColors['superkingdom']['Eukaryota'] = blueTaxon
+globalTaxonColors['superkingdom']['Archaea'] = colorGreen
+globalTaxonColors['superkingdom']['Bacteria'] = colorRed
+globalTaxonColors['superkingdom']['Eukaryota'] = colorBlue
+
+globalTaxonColors['kingdom']['Bacillati'] = f'#F200B2'
+globalTaxonColors['kingdom']['Metazoa'] = f'#00DEF2'
+globalTaxonColors['kingdom']['Methanobacteriati'] = f'#DEF200'
+globalTaxonColors['kingdom']['Promethearchaeati'] = f'#70218A'
+globalTaxonColors['kingdom']['Viridiplantae'] = f'#3A943A'
+
+
+
+# Micoreact shapes
+allAvailableShapes = [
+    "circle", "diamond", "dot", "heptagon", "heptagon-inverted", "heptagram", "heptagram-inverted", "hexagon", "hexagram", "octagon", "octagram", "pentagon",
+    "pentagon-inverted", "pentagram", "pentagram-inverted", "plus", "cross", "square", "star", "tetragram", "triangle", "triangle-inverted", "triangle-right",
+    "triangle-left", "chevron", "double-chevron", "chevron-inverted", "double-chevron-inverted", "chevron-right", "double-chevron-right", "chevron-left",
+    "double-chevron-left", "wye", "wye-inverted"
+]
+shapeCircle = 'circle'
+shapeDiamond = 'diamond'
+shapeSquare = 'square'
+shapeNone = 'cross'
+
+globalTaxonShapes = defaultdict(lambda: defaultdict(lambda: None))
+globalTaxonShapes['None'] = shapeNone
+
+globalTaxonShapes['superkingdom']['Archaea'] = shapeSquare
+globalTaxonShapes['superkingdom']['Bacteria'] = shapeCircle
+globalTaxonShapes['superkingdom']['Eukaryota'] = shapeDiamond
 
 
 
@@ -66,20 +95,22 @@ createdReadyFile = False
 globalDetectedFile = None
 createdDetectedFile = False
 
-globalProcessedFile = None
-createdProcessedFile = False
-
-globalAlignFile = None
-createdAlignFile = False
-
 globalTaxonomyFile = None
 createdTaxonomyFile = False
+
+globalCollectedRSSUFile = None
+createdCollectedRSSUFile = None
+
+globalProcessedFile = None
+createdProcessedFile = False
 
 globalMetadataFile = None
 createdMetadataFile = False
 
+globalAlignFile = None
+createdAlignFile = False
+
 globalTRNACount = None
-globalMetadataColors = None
 
 globalTaxonLevels = ['superkingdom', 'kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']
 globalTaxonLevelsCheat = {
@@ -184,6 +215,22 @@ def createDetectedFile(__detectedFile='detected', suppress=False):
 
     globalDetectedFile = os.popen(f'readlink -f {__detectedFile}.data').read()[:-1]
 
+def createTaxonomyFile(__taxonomyFile='taxonomy', suppress=False):
+    global globalTaxonomyFile, createdTaxonomyFile
+    
+    if not suppress: os.system(f'> {__taxonomyFile}.data')
+    createdTaxonomyFile = True
+
+    globalTaxonomyFile = os.popen(f'readlink -f {__taxonomyFile}.data').read()[:-1]
+
+def createCollectedRSSUFile(__rSSUFile='rSSU', suppress=False):
+    global globalCollectedRSSUFile, createdCollectedRSSUFile
+    
+    if not suppress: os.system(f'> {__rSSUFile}.data')
+    createdCollectedRSSUFile = True
+
+    globalCollectedRSSUFile = os.popen(f'readlink -f {__rSSUFile}.data').read()[:-1]
+
 def createProcessedFile(__processedFile='processed', suppress=False):
     global globalProcessedFile, createdProcessedFile
     
@@ -200,14 +247,6 @@ def createAlignFile(__alignFile='align', suppress=False):
 
     globalAlignFile = os.popen(f'readlink -f {__alignFile}.fasta').read()[:-1]
 
-def createTaxonomyFile(__taxonomyFile='taxonomy', suppress=False):
-    global globalTaxonomyFile, createdTaxonomyFile
-    
-    if not suppress: os.system(f'> {__taxonomyFile}.data')
-    createdTaxonomyFile = True
-
-    globalTaxonomyFile = os.popen(f'readlink -f {__taxonomyFile}.data').read()[:-1]
-
 def createMetadataFile(__metadataFile='metadata', suppress=False):
     global globalMetadataFile, createdMetadataFile
     
@@ -221,16 +260,17 @@ def initiate(
         __fetchFile='fetch',
         __readyFile='ready',
         __detectedFile='detected',
+        __taxonomyFile='taxonomy',
+        __rSSUFile='rSSU',
         __processedFile='processed',
         __alignFile='align',
-        __taxonomyFile='taxonomy',
         __metadataFile='metadata',
         
         suppressDownload=False,
         suppressFetch=False,
         suppressDetected=False,
-        suppressPreprocess=False,
         suppressTaxonomy=False,
+        suppressPreprocess=False,
         suppressAlign=False
     ):
     createGenomesPath(__genomesPath, suppress=suppressDownload)
@@ -356,8 +396,11 @@ def addToMetadataFile(metadataInfos, __metadataFile=None):
     global globalTaxonLevels, globalTaxonColors
     
     coloredTaxons = ['superkingdom', 'kingdom', 'phylum']
+    shapedTaxons = ['superkingdom', 'kingdom']
+
     taxonsTextGeneral = ';'.join(globalTaxonLevels)
     coloredTaxonsTextGeneral = ';'.join([f'{cTaxon}__color' for cTaxon in coloredTaxons])
+    shapedTaxonsTextGeneral = ';'.join([f'{sTaxon}__shape' for sTaxon in shapedTaxons])
 
     if __metadataFile == None:
         global globalMetadataFile
@@ -369,7 +412,7 @@ def addToMetadataFile(metadataInfos, __metadataFile=None):
         createMetadataFile()
 
     with open(metadataFile, 'a') as fileHandler:
-        firstLine = f'ID;taxID;tRNA-SeC number;score;{taxonsTextGeneral};{coloredTaxonsTextGeneral}\n'
+        firstLine = f'ID;taxID;tRNA-SeC number;score;{taxonsTextGeneral};{coloredTaxonsTextGeneral};{shapedTaxonsTextGeneral}\n'
         fileHandler.write(firstLine)
 
         for identification in metadataInfos:
@@ -390,13 +433,23 @@ def addToMetadataFile(metadataInfos, __metadataFile=None):
                         globalTaxonColors[superLevel][taxonomy[superLevel]] = randomColor()
                     colorToAppend = globalTaxonColors[superLevel][taxonomy[superLevel]]
                 else:
-                    colorToAppend = globalTaxonColors['None']
-                
+                    colorToAppend = globalTaxonColors['None']    
                 taxonsColors.append(colorToAppend)
+            
+            taxonsShapes = []
+            for superLevel in shapedTaxons:
+                if superLevel in taxonomy:
+                    if not taxonomy[superLevel] in globalTaxonShapes[superLevel]:
+                        globalTaxonShapes[superLevel][taxonomy[superLevel]] = randomShape()
+                    shapeToAppend = globalTaxonShapes[superLevel][taxonomy[superLevel]]
+                else:
+                    shapeToAppend = globalTaxonShapes['None']
+                taxonsShapes.append(shapeToAppend)
 
             taxonsColorText = ';'.join(taxonsColors)
+            taxonsShapeText = ';'.join(taxonsShapes)
 
-            text = f'{identification};{taxId};{tRNANumber};{score};{taxonsText};{taxonsColorText}\n'
+            text = f'{identification};{taxId};{tRNANumber};{score};{taxonsText};{taxonsColorText};{taxonsShapeText}\n'
 
             fileHandler.write(text)
 
@@ -1355,16 +1408,130 @@ def taxonCollection(__readyFile=None, __taxonomyFile=None, verbose=1):
 
 
 
-def preprocessAndMetadata(__detectedFile=None, __taxonomyFile=None, __processedFile=None, __metadataFile=None, highestScore=1, verbose=1, debug=1):
-    global globalTRNACount, globalTaxonLevels
-
-
-
+def collectRSSU(__detectedFile=None, __taxonomyFile=None, __rSSUFile=None, verbose=1, rssFile='SILVA_138.2_SSURef.rnac'):
+    global globalTaxonLevelsCheat, globalGenomesPath
+    
     if __detectedFile == None:
         global globalDetectedFile
         detectedFile = globalDetectedFile
     else:
         detectedFile = __detectedFile
+    
+    if __taxonomyFile == None:
+        global globalTaxonomyFile
+        taxonomyFile = globalTaxonomyFile
+    else:
+        taxonomyFile = __taxonomyFile
+
+    with open(detectedFile) as fileHandler:
+        detectedLines = fileHandler.readlines()
+
+    with open(taxonomyFile) as fileHandler:
+        taxonomyLines = fileHandler.readlines()
+
+    detectedNames = [splitted.strip('\n').split(' > ')[1] for splitted in detectedLines]
+
+    taxonomyInfos = {}
+    for line in taxonomyLines:
+        accession, organismName, taxId, popularName, chrFolder, taxonomy = line.strip('\n').split(' > ')
+        popularName = popularName if popularName != 'None' else None
+
+        if not organismName in detectedNames: continue
+
+        taxonomyInfos[organismName] = {
+            'accession': accession,
+            'tax-id': taxId,
+            'popular-name': popularName,
+            'chromosomes-folder': chrFolder
+        }
+
+        taxonomyInfos[organismName]['taxonomy'] = {}
+        for info in taxonomy.split(' | '):
+            level, name, taxId = info.split('<')
+            taxonomyInfos[organismName]['taxonomy'][level] = {'name': name, 'tax-id': taxId}
+
+    print(f'{tabulation}{magenta(f"rRNAs collection starting" + " | " + numberP(len(detectedNames)) + magenta(" genomes")):^140}')
+    totalIndexing = len(list(taxonomyInfos.keys()))
+    indexingSize = len(str(totalIndexing))
+
+    try:
+        global globalGenomesPath
+        os.chdir(globalGenomesPath + '/../16-18S DB')
+        if verbose:
+            print(f'{green("16S and 18S Databases folder found!") + magenta(" | ") + magenta("Attempting collection"):^215}')
+            print()
+    except Exception as e:
+        print(tabulation + red('ERROR:') + str(e))
+        sys.exit()
+
+    tot = 0
+    found = 0
+    rSSUInfos = {}
+
+    for i, organismName in enumerate(taxonomyInfos, 1):
+        popularName = taxonomyInfos[organismName]['popular-name']
+        accession = taxonomyInfos[organismName]['accession']
+        taxId = taxonomyInfos[organismName]['tax-id']
+
+        namePart = cyan(f' ({popularName} - {accession}/{taxId})' if popularName != None else f' ({accession}/{taxId})')
+        name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + namePart
+
+        if (verbose):            
+            pprint(yellow(name) + ':')
+
+        try:
+            shellCollectRSS = os.popen(f'grep "{taxId}" {rssFile}')
+            readCollectRSS = shellCollectRSS.read().replace('--\n', '')
+            shellCollectRSS.close()
+        except KeyboardInterrupt:
+            shellCollectRSS.close()
+            sys.exit()
+        except Exception as e:
+            print(tabulation + red('ERROR:') + str(e))
+            sys.exit()
+
+        if readCollectRSS != '':
+            pprint(green('Found!'))
+
+            infos = readCollectRSS.split('\n')[0]
+            sequence = infos.split('\t')[-1]
+
+            command = f'echo "{sequence}" > {globalGenomesPath}/{accession}/SSUSequence.fasta'
+            pprint(command)
+            sys.exit()
+
+            shellAddSSU = os.popen(command)
+
+            found += 1
+        else:
+            pprint(red('Not found!'))
+        tot += 1
+
+        if verbose:
+            print()
+
+    pprint(yellow(f'{found}/{tot}'))
+    sys.exit()
+
+    addToRSSUFile(rSSUInfos, __rSSUFile)
+
+    print(
+        f'{tabulation}{magenta(f"rRNAs collection finished"):^120}'
+    )
+    separator()
+
+
+
+def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=None, __metadataFile=None, highestScore=1, verbose=1, debug=1):
+    global globalTRNACount, globalTaxonLevels
+
+
+
+    if __rSSUFile == None:
+        global globalCollectedRSSUFile
+        rSSUFile = globalCollectedRSSUFile
+    else:
+        rSSUFile = __rSSUFile
 
     if __taxonomyFile == None:
         global globalTaxonomyFile
@@ -1374,20 +1541,20 @@ def preprocessAndMetadata(__detectedFile=None, __taxonomyFile=None, __processedF
 
 
 
-    with open(detectedFile, 'r') as fileHandler:
-        detectedLines = fileHandler.readlines()
+    with open(rSSUFile, 'r') as fileHandler:
+        rSSULines = fileHandler.readlines()
 
     with open(taxonomyFile, 'r') as fileHandler:
         taxonLines = fileHandler.readlines()
     
 
 
-    detectedInfos = {}
-    for info in detectedLines:
+    rSSUInfos = {}
+    for info in rSSULines:
         splitted = info.strip('\n').split(' > ')
         popularName = splitted[3] if splitted[3] != 'None' else None
 
-        detectedInfos[splitted[1]] = {
+        rSSUInfos[splitted[1]] = {
             'accession': splitted[0],
             'tax-id': splitted[2],
             'popular-name': popularName,
@@ -1425,14 +1592,14 @@ def preprocessAndMetadata(__detectedFile=None, __taxonomyFile=None, __processedF
 
 
 
-    print(f'{tabulation}{magenta(f"Preprocessing tRNAs-SeC starting" + " | " + numberP(len(detectedLines)) + magenta(" genomes")):^140}\n')
-    totalIndexing = len(list(detectedInfos.keys()))
+    print(f'{tabulation}{magenta(f"Preprocessing tRNAs-SeC starting" + " | " + numberP(len(rSSULines)) + magenta(" genomes")):^140}\n')
+    totalIndexing = len(list(rSSUInfos.keys()))
     indexingSize = len(str(totalIndexing))
-    for i, organismName in enumerate(detectedInfos, 1):
-        chromosomesFolder = detectedInfos[organismName]['chromosomes-folder']
-        popularName = detectedInfos[organismName]['popular-name']
-        accession = detectedInfos[organismName]['accession']
-        taxId = detectedInfos[organismName]['tax-id']
+    for i, organismName in enumerate(rSSUInfos, 1):
+        chromosomesFolder = rSSUInfos[organismName]['chromosomes-folder']
+        popularName = rSSUInfos[organismName]['popular-name']
+        accession = rSSUInfos[organismName]['accession']
+        taxId = rSSUInfos[organismName]['tax-id']
         name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + cyan(f' ({popularName} - {accession}/{taxId})' if popularName != None else f' ({accession}/{taxId})')
 
         if (verbose):            
@@ -1482,7 +1649,7 @@ def preprocessAndMetadata(__detectedFile=None, __taxonomyFile=None, __processedF
                         hScore = score
                         headerFinal = f'>{index}'
                         metadataInfos[headerFinal[1:]] = {'taxonomy': taxonomyInfos[organismName]['taxonomy'], 'tax-id': taxId, 'trna-number': j, 'score': score}
-                        processedInfos[organismName] = {'info': detectedInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
+                        processedInfos[organismName] = {'info': rSSUInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
 
                 tRNAs += 1
                 index += 1
@@ -1504,7 +1671,7 @@ def preprocessAndMetadata(__detectedFile=None, __taxonomyFile=None, __processedF
 
                     headerFinal = f'>{index}'
                     metadataInfos[headerFinal[1:]] = {'taxonomy': taxonomyInfos[organismName]['taxonomy'], 'tax-id': taxId, 'trna-number': j}
-                    processedInfos[f'{organismName}.{j}'] = {'info': detectedInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
+                    processedInfos[f'{organismName}.{j}'] = {'info': rSSUInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
 
                     tRNAs += 1
                     index += 1
@@ -1655,122 +1822,6 @@ def taxonAnalysis(__level='all', __taxonomyFile=None, __detectedFile=None, verbo
 
     print(
         f'{tabulation}{magenta(f"Taxon ({__level}) analysis finished"):^120}'
-    )
-    separator()
-
-
-
-def collectRRS(__detectedFile=None, __taxonomyFile=None, verbose=1, king=None):
-    global globalTaxonLevelsCheat
-
-    if ((king == 'Archaea') or (king == 'Eubacteria')):
-        # letterFunc = str.upper
-        rssFile = 'MIMt-16S_M2c_24_4.fna'
-    elif (king == 'Eukaryota'):
-        # letterFunc = str.lower
-        rssFile = 'General_EUK_SSU_v1.9.fasta'
-    elif (king == None):
-        rssFile = 'SILVA_138.2_SSURef.rnac'
-    else:
-        pprint(red('ERROR! INVALID KINGDOM!'))
-        pprint(yellow(king))
-        sys.exit()
-
-    if __detectedFile == None:
-        global globalDetectedFile
-        detectedFile = globalDetectedFile
-    else:
-        detectedFile = __detectedFile
-    
-    if __taxonomyFile == None:
-        global globalTaxonomyFile
-        taxonomyFile = globalTaxonomyFile
-    else:
-        taxonomyFile = __taxonomyFile
-
-    with open(detectedFile) as fileHandler:
-        detectedLines = fileHandler.readlines()
-
-    with open(taxonomyFile) as fileHandler:
-        taxonomyLines = fileHandler.readlines()
-
-    detectedNames = [splitted.strip('\n').split(' > ')[1] for splitted in detectedLines]
-
-    taxonomyInfos = {}
-    for line in taxonomyLines:
-        accession, organismName, taxId, popularName, chrFolder, taxonomy = line.strip('\n').split(' > ')
-        popularName = popularName if popularName != 'None' else None
-
-        if not organismName in detectedNames: continue
-
-        taxonomyInfos[organismName] = {
-            'accession': accession,
-            'tax-id': taxId,
-            'popular-name': popularName,
-            'chromosomes-folder': chrFolder
-        }
-
-        taxonomyInfos[organismName]['taxonomy'] = {}
-        for info in taxonomy.split(' | '):
-            level, name, taxId = info.split('<')
-            taxonomyInfos[organismName]['taxonomy'][level] = {'name': name, 'tax-id': taxId}
-
-    print(f'{tabulation}{magenta(f"rRNAs collection starting" + " | " + numberP(len(detectedNames)) + magenta(" genomes")):^140}')
-    totalIndexing = len(list(taxonomyInfos.keys()))
-    indexingSize = len(str(totalIndexing))
-
-    try:
-        global globalGenomesPath
-        os.chdir(globalGenomesPath + '/../16-18S DB')
-        if verbose:
-            print(f'{green("16S and 18S Databases folder found!") + magenta(" | ") + magenta("Attempting collection"):^215}')
-            print()
-    except Exception as e:
-        print(tabulation + red('ERROR:') + str(e))
-        sys.exit()
-
-    found = 0
-    tot = 0
-    for i, organismName in enumerate(taxonomyInfos, 1):
-        popularName = taxonomyInfos[organismName]['popular-name']
-        accession = taxonomyInfos[organismName]['accession']
-        taxId = taxonomyInfos[organismName]['tax-id']
-
-        namePart = cyan(f' ({popularName} - {accession}/{taxId})' if popularName != None else f' ({accession}/{taxId})')
-        name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + namePart
-
-        if (verbose):            
-            pprint(yellow(name) + ':')
-
-        # commandPart = ''
-        # for i, level in enumerate(taxonomyInfos[organismName]['taxonomy'], 1):
-        #     if level == 'kingdom': continue
-        #     levelName = taxonomyInfos[organismName]['taxonomy'][level]['name']
-        #     levelTaxId = taxonomyInfos[organismName]['taxonomy'][level]['tax-id']
-        #     commandPart += letterFunc(globalTaxonLevelsCheat[level]) + (f'__{levelName}; ' if i<len(taxonomyInfos[organismName]['taxonomy']) else f'__{levelName}')
-        # command = f'grep "{commandPart}" {rssFile}'
-        command = f'grep "{taxonomyInfos[organismName]["taxonomy"]["species"]["name"]}" {rssFile} -A 1'
-        # command = f'grep "{organismName}" {rssFile} -A 1'
-
-        try:
-            shellCollectRSS = os.popen(command)
-            readCollectRSS = shellCollectRSS.read().replace('--\n', '')
-            shellCollectRSS.close()
-        except Exception as e:
-            print(tabulation + red('ERROR:') + str(e))
-            sys.exit()
-
-        print(tabulation + command)
-        print(tabulation + readCollectRSS)
-        found += 1 if readCollectRSS != '' else 0
-
-        if verbose:
-            print()
-
-    print(tabulation + red(found))
-
-    print(
-        f'{tabulation}{magenta(f"rRNAs collection finished"):^120}'
     )
     separator()
 
