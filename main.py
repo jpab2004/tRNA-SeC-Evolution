@@ -49,7 +49,9 @@ parser.add_argument('--fetch-file', help='The name for the default fetch file in
 parser.add_argument('--ready-file', help='The name for the default ready file information.')
 parser.add_argument('--detected-file', help='The name for the default detected file information.')
 parser.add_argument('--processed-file', help='The name for the default processed file information.')
+parser.add_argument('--processed-rSSU-file', help='The name for the default processed file information for rSSU.')
 parser.add_argument('--align-file', help='The name for the default alignment file.')
+parser.add_argument('--align-rSSU-file', help='The name for the default alignment file for rSSU.')
 parser.add_argument('--taxonomy-file', help='The name for the default taxonomy file.')
 parser.add_argument('--metadata-file', help='The name for the default metadata file.')
 
@@ -68,25 +70,26 @@ parser.add_argument('--refseq', help='Use RefSeq expanded search.', action='stor
 parser.add_argument('--all-scores', help='Use all the tRNA-SeC, independent of score search.', action='store_false')
 
 parser.add_argument('--quiet', help='Quiet printing.', action='store_false')
-parser.add_argument('-QD', '--q-download', help='Quiet for download.', action='store_false')
-parser.add_argument('-QF', '--q-fetch', help='Quiet for fetch.', action='store_false')
-parser.add_argument('-QS', '--q-scan', help='Quiet for scan.', action='store_false')
-parser.add_argument('-QDe', '--q-detected', help='Quiet for detected tRNAs-SeC.', action='store_false')
-parser.add_argument('-QP', '--q-preprocess', help='Quiet for preprocess tRNAs-SeC.', action='store_false')
-parser.add_argument('-QT', '--q-taxonomy', help='Quiet for taxonomy detection.', action='store_false')
-parser.add_argument('-QTA', '--q-taxana', help='Quiet for taxonomy analysis.', action='store_false')
-parser.add_argument('-QRRS', '--q-rRNAs', help='Quiet for rRNAsmallsubunit collection.', action='store_false')
+parser.add_argument('--q-download', help='Quiet for download.', action='store_false')
+parser.add_argument('--q-fetch', help='Quiet for fetch.', action='store_false')
+parser.add_argument('--q-scan', help='Quiet for scan.', action='store_false')
+parser.add_argument('--q-detected', help='Quiet for detected tRNAs-SeC.', action='store_false')
+parser.add_argument('--q-process', help='Quiet for process tRNAs-SeC.', action='store_false')
+parser.add_argument('--q-taxonomy', help='Quiet for taxonomy detection.', action='store_false')
+parser.add_argument('--q-taxana', help='Quiet for taxonomy analysis.', action='store_false')
+parser.add_argument('--q-rRNAs-collection', help='Quiet for rRNAsmallsubunit collection.', action='store_false')
+parser.add_argument('--q-align', help='Quiet for MAFFT alignment.', action='store_false')
 
-parser.add_argument('-SD', '--suppress-download', help='Suppress download process.', action='store_false')
-parser.add_argument('-SF', '--suppress-fetch', help='Suppress fetch process.', action='store_false')
-parser.add_argument('-SS', '--suppress-scan', help='Suppress scan process.', action='store_false')
-parser.add_argument('-SDe', '--suppress-detected', help='Suppress detected process.', action='store_false')
-parser.add_argument('-SP', '--suppress-preprocess', help='Suppress preprocess.', action='store_false')
-parser.add_argument('-SPh', '--suppress-taxonomy', help='Suppress taxonomy process.', action='store_false')
-parser.add_argument('-SPA', '--suppress-taxana', help='Suppress taxonomy analysis process.', action='store_false')
-parser.add_argument('-SRSS', '--suppress-rRNAs', help='Suppress rRNAsmallsubunit collection.', action='store_false')
-parser.add_argument('-SAl', '--suppress-align', help='Suppress MAFFT alignment.', action='store_false')
-parser.add_argument('-SM', '--suppress-metadata', help='Suppress metadata process.', action='store_false')
+parser.add_argument('--suppress-download', help='Suppress download process.', action='store_false')
+parser.add_argument('--suppress-fetch', help='Suppress fetch process.', action='store_false')
+parser.add_argument('--suppress-scan', help='Suppress scan process.', action='store_false')
+parser.add_argument('--suppress-detected', help='Suppress detected process.', action='store_false')
+parser.add_argument('--suppress-process', help='Suppress process.', action='store_false')
+parser.add_argument('--suppress-taxonomy', help='Suppress taxonomy process.', action='store_false')
+parser.add_argument('--suppress-taxana', help='Suppress taxonomy analysis process.', action='store_false')
+parser.add_argument('--suppress-rRNAs-collection', help='Suppress rRNAsmallsubunit collection.', action='store_false')
+parser.add_argument('--suppress-align', help='Suppress MAFFT alignment.', action='store_false')
+parser.add_argument('--suppress-metadata', help='Suppress metadata process.', action='store_false')
 
 args=parser.parse_args()
 
@@ -98,7 +101,9 @@ fetchFile = args.fetch_file if args.fetch_file != None else 'fetch'
 readyFile = args.ready_file if args.ready_file != None else 'ready'
 detectedFile = args.detected_file if args.detected_file != None else 'detected'
 processedFile = args.processed_file if args.processed_file != None else 'processed'
+processedRSSUFile = args.processed_rSSU_file if args.processed_rSSU_file != None else 'processedRSSU'
 alignFile = args.align_file if args.align_file != None else 'align'
+alignRSSUFile = args.align_rSSU_file if args.align_rSSU_file != None else 'alignRSSU'
 taxonomyFile = args.taxonomy_file if args.taxonomy_file != None else 'taxonomy'
 metadataFile = args.metadata_file if args.metadata_file != None else 'metadata'
 
@@ -122,28 +127,30 @@ if not quiet:
     verboseFetch = 0
     verboseScan = 0
     verboseDetected = 0
-    verbosePreprocess = 0
+    verboseProcess = 0
     verboseTaxonomy = 0
     verboseTaxonAnalysis = 0
     verboseRRS = 0
+    verboseAl = 0
 else:
     verboseDownload = args.q_download
     verboseFetch = args.q_fetch
     verboseScan = args.q_scan
     verboseDetected = args.q_detected
-    verbosePreprocess = args.q_preprocess
+    verboseProcess = args.q_process
     verboseTaxonomy = args.q_taxonomy
     verboseTaxonAnalysis = args.q_taxana
-    verboseRRS = args.q_rRNAs
+    verboseRRS = args.q_rRNAs_collection
+    verboseAl = args.q_align
 
 suppressDownload = args.suppress_download
 suppressFetch = args.suppress_fetch
 suppressScan = args.suppress_scan
 suppressDetected = args.suppress_detected
-suppressPreprocess = args.suppress_preprocess
+suppressProcess = args.suppress_process
 suppressTaxonomy = args.suppress_taxonomy
 suppressTaxonAnalysis = args.suppress_taxana
-suppressRRS = args.suppress_rRNAs
+suppressRSSU = args.suppress_rRNAs_collection
 suppressAlign = args.suppress_align
 suppressMetadata = args.suppress_metadata
 
@@ -163,15 +170,18 @@ files = {
     '__readyFile': readyFile + suffix,
     '__detectedFile': detectedFile + suffix,
     '__processedFile': processedFile + suffix + suffixScore,
+    '__processedRSSUFile': processedRSSUFile + suffix + suffixScore,
     '__alignFile': alignFile + suffixScore,
+    '__alignRSSUFile': alignRSSUFile + suffixScore,
     '__taxonomyFile': taxonomyFile,
     '__metadataFile': metadataFile + suffixScore,
 
     'suppressDownload': not suppressDownload,
     'suppressFetch': not suppressFetch,
     'suppressDetected': not suppressDetected,
-    'suppressPreprocess': not suppressPreprocess,
     'suppressTaxonomy': not suppressTaxonomy,
+    'suppressRSSU': not suppressRSSU,
+    'suppressProcess': not suppressProcess,
     'suppressAlign': not suppressAlign
 }
 initiate(**files)
@@ -183,9 +193,9 @@ if suppressFetch: downloadFetch(verbose=verboseFetch)
 if suppressScan: trnaScanSE(verbose=verboseScan)
 if suppressDetected: findDetectedSeC(verbose=verboseDetected)
 if suppressTaxonomy: taxonomyCollection(verbose=verboseTaxonomy)
-if suppressRRS: collectRSSU(verbose=verboseRRS)
-if suppressPreprocess: processAndMetadata(highestScore=highestScore, verbose=verbosePreprocess, debug=0)
+if suppressRSSU: collectRSSU(verbose=verboseRRS)
+if suppressProcess: processAndMetadata(highestScore=highestScore, verbose=verboseProcess)
 if suppressTaxonAnalysis: taxonAnalysis(taxonLevel, verbose=verboseTaxonAnalysis, sequential=sequentialAnalysis, debug=0)
 
 if ((referenceRange == None) and (suppressAlign)):
-    alignMAFFT()
+    alignMAFFT(verbose=verboseAl)

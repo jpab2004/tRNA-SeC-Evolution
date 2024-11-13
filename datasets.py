@@ -103,12 +103,16 @@ createdCollectedRSSUFile = False
 
 globalProcessedFile = None
 createdProcessedFile = False
+globalProcessedRSSUFile = None
+createdProcessedRSSUFile = False
 
 globalMetadataFile = None
 createdMetadataFile = False
 
 globalAlignFile = None
 createdAlignFile = False
+globalAlignRSSUFile = None
+createdAlignRSSUFile = False
 
 globalTRNACount = None
 
@@ -239,6 +243,14 @@ def createProcessedFile(__processedFile='processed', suppress=False):
 
     globalProcessedFile = os.popen(f'readlink -f {__processedFile}.fna').read()[:-1]
 
+def createProcessedRSSUFile(__processedRSSUFile='processedRSSU', suppress=False):
+    global globalProcessedRSSUFile, createdProcessedRSSUFile
+    
+    if not suppress: os.system(f'> {__processedRSSUFile}.fna')
+    createdProcessedRSSUFile = True
+
+    globalProcessedRSSUFile = os.popen(f'readlink -f {__processedRSSUFile}.fna').read()[:-1]
+
 def createAlignFile(__alignFile='align', suppress=False):
     global globalAlignFile, createdAlignFile
     
@@ -246,6 +258,14 @@ def createAlignFile(__alignFile='align', suppress=False):
     createdAlignFile = True
 
     globalAlignFile = os.popen(f'readlink -f {__alignFile}.fasta').read()[:-1]
+
+def createAlignRSSUFile(__alignRSSUFile='alignRSSU', suppress=False):
+    global globalAlignRSSUFile, createdAlignRSSUFile
+    
+    if not suppress: os.system(f'> {__alignRSSUFile}.fasta')
+    createdAlignRSSUFile = True
+
+    globalAlignRSSUFile = os.popen(f'readlink -f {__alignRSSUFile}.fasta').read()[:-1]
 
 def createMetadataFile(__metadataFile='metadata', suppress=False):
     global globalMetadataFile, createdMetadataFile
@@ -263,24 +283,30 @@ def initiate(
         __taxonomyFile='taxonomy',
         __rSSUFile='rSSU',
         __processedFile='processed',
+        __processedRSSUFile='processedRSSU',
         __alignFile='align',
+        __alignRSSUFile='alignRSSU',
         __metadataFile='metadata',
         
         suppressDownload=False,
         suppressFetch=False,
         suppressDetected=False,
         suppressTaxonomy=False,
-        suppressPreprocess=False,
+        suppressRSSU=False,
+        suppressProcess=False,
         suppressAlign=False
     ):
     createGenomesPath(__genomesPath, suppress=suppressDownload)
     createFetchFile(__fetchFile, suppress=suppressFetch)
     createReadyFile(__readyFile, suppress=(suppressDownload and suppressFetch))
     createDetectedFile(__detectedFile, suppress=suppressDetected)
-    createProcessedFile(__processedFile, suppress=suppressPreprocess)
-    createAlignFile(__alignFile, suppress=suppressAlign)
     createTaxonomyFile(__taxonomyFile, suppress=suppressTaxonomy)
-    createMetadataFile(__metadataFile, suppress=suppressPreprocess)
+    createCollectedRSSUFile(__rSSUFile, suppress=suppressRSSU)
+    createProcessedFile(__processedFile, suppress=suppressProcess)
+    createProcessedRSSUFile(__processedRSSUFile, suppress=suppressProcess)
+    createAlignFile(__alignFile, suppress=suppressAlign)
+    createAlignRSSUFile(__alignRSSUFile, suppress=suppressAlign)
+    createMetadataFile(__metadataFile, suppress=suppressProcess)
 
     return
 
@@ -390,6 +416,25 @@ def addToProcessedFile(processedInfos, __processedFile=None):
         for name in processedInfos:
             header = processedInfos[name]['header']
             sequence = processedInfos[name]['sequence']
+
+            fileHandler.write(f'{header}\n{sequence}\n')
+        
+def addToProcessedRSSUFile(processedRSSUInfos, __processedRSSUFile=None):
+    global globalProcessedRSSUFile
+    
+    if __processedRSSUFile == None:
+        processedRSSUFile = globalProcessedRSSUFile
+    else:
+        processedRSSUFile = __processedRSSUFile
+
+    if not createdProcessedRSSUFile:
+        createProcessedRSSUFile(processedRSSUFile)
+        processedRSSUFile = globalProcessedRSSUFile
+
+    with open(processedRSSUFile, 'a') as fileHandler:
+        for name in processedRSSUInfos:
+            header = processedRSSUInfos[name]['header']
+            sequence = processedRSSUInfos[name]['sequence']
 
             fileHandler.write(f'{header}\n{sequence}\n')
 
@@ -1610,8 +1655,8 @@ def collectRSSU(__detectedFile=None, __taxonomyFile=None, __rSSUFile=None, verbo
 
 
 
-def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=None, __metadataFile=None, highestScore=1, verbose=1, debug=1):
-    global globalTRNACount, globalTaxonLevels
+def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=None, __processedRSSUFile=None, __metadataFile=None, highestScore=1, verbose=1):
+    global globalTRNACount, globalTaxonLevels, globalGenomesPath
 
 
 
@@ -1675,11 +1720,12 @@ def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=Non
     tRNAs = 0
     skipped = 0
     processedInfos = {}
+    processedRSSUInfos = {}
     metadataInfos = {}
 
 
 
-    print(f'{tabulation}{magenta(f"Preprocessing tRNAs-SeC starting" + " | " + numberP(len(rSSULines)) + magenta(" genomes")):^140}\n')
+    print(f'{tabulation}{magenta(f"Processing tRNAs-SeC starting" + " | " + numberP(len(rSSULines)) + magenta(" genomes")):^140}\n')
     totalIndexing = len(list(rSSUInfos.keys()))
     indexingSize = len(str(totalIndexing))
     for i, organismName in enumerate(rSSUInfos, 1):
@@ -1711,8 +1757,18 @@ def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=Non
             detectedTRNAs = shellDetected.read()[:-1].replace('--\n', '').split('>')[1:]
             shellDetected.close()
 
-            if debug:
-                print(detectedTRNAs, end='\n\n')
+            shellRSSU = os.popen(f'cat {globalGenomesPath}/{accession}/SSUSequence+.fasta')
+            rSSUSequence = shellRSSU.read()
+            shellRSSU.close()
+
+            if rSSUSequence == '':
+                if verbose:
+                    ps(red('Could not find rSSU sequence!'))
+                    pe(cyan('Skipping organism'))
+                    print()
+
+                skipped += 1
+                continue
 
             if highestScore:
                 hScore = 0
@@ -1725,9 +1781,6 @@ def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=Non
                     if tRNASequence == '':
                         continue
 
-                    if debug:
-                        print(headerInfos, tRNASequence, sep='\n')
-
                     chromosomeState, chromosomeNumber, tRNANumber = headerInfos[0][1:].split('.')
                     chromosomePosition = headerInfos[1].split(':')[1]
                     strand, size, score = headerInfos[2], headerInfos[5], float(headerInfos[8])
@@ -1737,6 +1790,7 @@ def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=Non
                         headerFinal = f'>{index}'
                         metadataInfos[headerFinal[1:]] = {'taxonomy': taxonomyInfos[organismName]['taxonomy'], 'tax-id': taxId, 'trna-number': j, 'score': score}
                         processedInfos[organismName] = {'info': rSSUInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
+                        processedRSSUInfos[organismName] = {'info': rSSUInfos[organismName], 'header': headerFinal, 'sequence': rSSUSequence}
 
                 tRNAs += 1
                 index += 1
@@ -1748,9 +1802,6 @@ def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=Non
 
                     if tRNASequence == '':
                         continue
-
-                    if debug:
-                        print(headerInfos, tRNASequence, sep='\n')
 
                     chromosomeState, chromosomeNumber, tRNANumber = headerInfos[0][1:].split('.')
                     chromosomePosition = headerInfos[1].split(':')[1]
@@ -1776,11 +1827,12 @@ def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=Non
             print()
 
     addToProcessedFile(processedInfos, __processedFile)
+    addToProcessedRSSUFile(processedRSSUInfos, __processedRSSUFile)
     addToMetadataFile(metadataInfos, __metadataFile)
     globalTRNACount = tRNAs
 
     print(
-        f'{tabulation}{magenta("tRNAs-SeC preprocessing ended | ") + numberP(count) + magenta(" genomes processed (") + numberP(tRNAs) + magenta(" tRNAs-SeC) & ") +
+        f'{tabulation}{magenta("tRNAs-SeC processing ended | ") + numberP(count) + magenta(" genomes processed (") + numberP(tRNAs) + magenta(" tRNAs-SeC) & ") +
         numberP(skipped) + magenta(" skipped"):^175}'
     )
     separator()
@@ -1914,7 +1966,7 @@ def taxonAnalysis(__level='all', __taxonomyFile=None, __detectedFile=None, verbo
 
 
 
-def alignMAFFT(__processedFile=None, __alignFile=None, progress=0):
+def alignMAFFT(__processedFile=None, __processedRSSUFile=None, __alignFile=None, __alignRSSUFile=None, progress=0, verbose=1):
     global globalTRNACount
 
     if globalTRNACount == None: tRNACount = red('UNDEFINED!')
@@ -1925,6 +1977,12 @@ def alignMAFFT(__processedFile=None, __alignFile=None, progress=0):
         processedFile = globalProcessedFile
     else:
         processedFile = __processedFile
+    
+    if __processedRSSUFile == None:
+        global globalProcessedRSSUFile
+        processedRSSUFile = globalProcessedRSSUFile
+    else:
+        processedRSSUFile = __processedRSSUFile
 
     if __alignFile == None:
         global globalAlignFile
@@ -1932,15 +1990,39 @@ def alignMAFFT(__processedFile=None, __alignFile=None, progress=0):
     else:
         alignFile = __alignFile
 
+    if __alignRSSUFile == None:
+        global globalAlignRSSUFile
+        alignRSSUFile = globalAlignRSSUFile
+    else:
+        alignRSSUFile = __alignRSSUFile
+
     print(f'{tabulation}{magenta(f"MAFFT alignment starting" + " | " + tRNACount + magenta(" tRNAs-SeC")):^140}\n')
     try:
         args = '--auto --reorder'
         if not progress:
             args += ' --quiet'
 
+        if verbose:
+            pprint(yellow('tRNA-SeC:'))
+            ps(green('starting'))
+
         shellMAFFT = os.popen(f'mafft {args} "{processedFile}" > "{alignFile}"')
         _ = shellMAFFT.read()
         shellMAFFT.close()
+
+        if verbose:
+            pe(red('ended'))
+            print()
+            pprint(yellow('rSSU:'))
+            ps(green('starting'))
+
+        shellMAFFTRSSU = os.popen(f'mafft {args} "{processedRSSUFile}" > "{alignRSSUFile}"')
+        _ = shellMAFFTRSSU.read()
+        shellMAFFTRSSU.close()
+
+        if verbose:
+            pe(red('ended'))
+            print()
     except KeyboardInterrupt:
         sys.exit()
     except Exception as e:
