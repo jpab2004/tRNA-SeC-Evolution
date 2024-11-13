@@ -99,7 +99,7 @@ globalTaxonomyFile = None
 createdTaxonomyFile = False
 
 globalCollectedRSSUFile = None
-createdCollectedRSSUFile = None
+createdCollectedRSSUFile = False
 
 globalProcessedFile = None
 createdProcessedFile = False
@@ -223,7 +223,7 @@ def createTaxonomyFile(__taxonomyFile='taxonomy', suppress=False):
 
     globalTaxonomyFile = os.popen(f'readlink -f {__taxonomyFile}.data').read()[:-1]
 
-def createCollectedRSSUFile(__rSSUFile='rSSU', suppress=False):
+def createCollectedRSSUFile(__rSSUFile='collectedRSSU', suppress=False):
     global globalCollectedRSSUFile, createdCollectedRSSUFile
     
     if not suppress: os.system(f'> {__rSSUFile}.data')
@@ -287,14 +287,16 @@ def initiate(
 
 
 def addToFetchFile(fetchInfos, __fetchFile=None):
+    global globalFetchFile
+    
     if __fetchFile == None:
-        global globalFetchFile
         fetchFile = globalFetchFile
     else:
         fetchFile = __fetchFile
 
     if not createdFetchFile:
-        createFetchFile()
+        createFetchFile(fetchFile)
+        fetchFile = globalFetchFile
 
     with open(fetchFile, 'a') as fileHandler:
         for name in fetchInfos:
@@ -308,14 +310,16 @@ def addToFetchFile(fetchInfos, __fetchFile=None):
             fileHandler.write(f'{accession} > {name} > {taxId} > {popularName} > {fetchFolderPath} > {chromosomesFolderPath} > {kingdom}\n')
 
 def addToReadyFile(readyInfos, __readyFile=None):
+    global globalReadyFile
+    
     if __readyFile == None:
-        global globalReadyFile
         readyFile = globalReadyFile
     else:
         readyFile = __readyFile
 
     if not createdReadyFile:
-        createReadyFile()
+        createReadyFile(readyFile)
+        readyFile = globalReadyFile
 
     with open(readyFile, 'a') as fileHandler:
         for name in readyInfos:
@@ -328,14 +332,16 @@ def addToReadyFile(readyInfos, __readyFile=None):
             fileHandler.write(f'{accession} > {name} > {taxId} > {popularName} > {chromosomesFolderPath} > {kingdom}\n')
 
 def addToDetectedFile(detectedInfos, __detectedFile=None):
+    global globalDetectedFile
+    
     if __detectedFile == None:
-        global globalDetectedFile
         detectedFile = globalDetectedFile
     else:
         detectedFile = __detectedFile
 
     if not createdDetectedFile:
-        createDetectedFile()
+        createDetectedFile(detectedFile)
+        detectedFile = globalDetectedFile
 
     with open(detectedFile, 'a') as fileHandler:
         for name in detectedInfos:
@@ -347,15 +353,38 @@ def addToDetectedFile(detectedInfos, __detectedFile=None):
 
             fileHandler.write(f'{accession} > {name} > {taxId} > {popularName} > {chromosomesFolderPath} > {kingdom}\n')
 
+def addToRSSUFile(rSSUInfos, __rSSUFile=None):
+    global globalCollectedRSSUFile
+    
+    if __rSSUFile == None:
+        rSSUFile = globalCollectedRSSUFile
+    else:
+        rSSUFile = __rSSUFile
+
+    if not createdCollectedRSSUFile:
+        createCollectedRSSUFile(rSSUFile)
+        rSSUFile = globalCollectedRSSUFile
+
+    with open(rSSUFile, 'a') as fileHandler:
+        for name in rSSUInfos:
+            accession = rSSUInfos[name]['accession']
+            taxId = rSSUInfos[name]['tax-id']
+            chromosomesFolderPath = rSSUInfos[name]['chromosomes-folder'].strip('\n')
+            popularName = rSSUInfos[name]['popular-name']
+
+            fileHandler.write(f'{accession} > {name} > {taxId} > {popularName} > {chromosomesFolderPath}\n')
+
 def addToProcessedFile(processedInfos, __processedFile=None):
+    global globalProcessedFile
+    
     if __processedFile == None:
-        global globalProcessedFile
         processedFile = globalProcessedFile
     else:
         processedFile = __processedFile
 
     if not createdProcessedFile:
-        createProcessedFile()
+        createProcessedFile(processedFile)
+        processedFile = globalProcessedFile
 
     with open(processedFile, 'a') as fileHandler:
         for name in processedInfos:
@@ -365,16 +394,16 @@ def addToProcessedFile(processedInfos, __processedFile=None):
             fileHandler.write(f'{header}\n{sequence}\n')
 
 def addToTaxonomyFile(taxonInfos, __taxonomyFile=None):
-    global globalTaxonLevels
+    global globalTaxonLevels, globalTaxonomyFile
 
     if __taxonomyFile == None:
-        global globalTaxonomyFile
         taxonomyFile = globalTaxonomyFile
     else:
         taxonomyFile = __taxonomyFile
 
     if not createdTaxonomyFile:
-        createTaxonomyFile()
+        createTaxonomyFile(taxonomyFile)
+        taxonomyFile = globalTaxonomyFile
 
     with open(taxonomyFile, 'a') as fileHandler:
         for name in taxonInfos:
@@ -393,7 +422,7 @@ def addToTaxonomyFile(taxonInfos, __taxonomyFile=None):
             fileHandler.write(f'{accession} > {name} > {taxId} > {popularName} > {chromosomesFolderPath} > {command}\n')
 
 def addToMetadataFile(metadataInfos, __metadataFile=None):
-    global globalTaxonLevels, globalTaxonColors
+    global globalTaxonLevels, globalTaxonColors, globalMetadataFile
     
     coloredTaxons = ['superkingdom', 'kingdom', 'phylum']
     shapedTaxons = ['superkingdom', 'kingdom']
@@ -403,13 +432,13 @@ def addToMetadataFile(metadataInfos, __metadataFile=None):
     shapedTaxonsTextGeneral = ';'.join([f'{sTaxon}__shape' for sTaxon in shapedTaxons])
 
     if __metadataFile == None:
-        global globalMetadataFile
         metadataFile = globalMetadataFile
     else:
         metadataFile = __metadataFile
 
     if not createdMetadataFile:
-        createMetadataFile()
+        createMetadataFile(metadataFile)
+        metadataFile = globalMetadataFile
 
     with open(metadataFile, 'a') as fileHandler:
         firstLine = f'ID;taxID;tRNA-SeC number;score;{taxonsTextGeneral};{coloredTaxonsTextGeneral};{shapedTaxonsTextGeneral}\n'
@@ -1262,7 +1291,7 @@ def taxonomyCollection(__readyFile=None, __taxonomyFile=None, verbose=1):
     count = 0
     found = 0
     skipped = 0
-    taxonInfos = {}
+    taxonomyInfos = {}
 
     print(f'{tabulation}{magenta(f"Taxonomy collection starting" + " | " + numberP(len(readyLines)) + magenta(" genomes")):^140}\n')
     totalIndexing = len(list(readyInfos.keys()))
@@ -1274,25 +1303,25 @@ def taxonomyCollection(__readyFile=None, __taxonomyFile=None, verbose=1):
         taxId = readyInfos[organismName]['tax-id']
         name = f'{i:<{indexingSize}}/{totalIndexing}. {organismName}' + cyan(f' ({popularName} - {accession}/{taxId})' if popularName != None else f' ({accession}/{taxId})')
 
-        shellTaxonCollected = os.popen(f'if [ -e {globalGenomesPath}/{accession}/taxonomy.status ]; then echo "1"; else echo "0"; fi;')
-        if int(shellTaxonCollected.read()):
+        shellTaxonomyCollected = os.popen(f'if [ -e {globalGenomesPath}/{accession}/taxonomy.status ]; then echo "1"; else echo "0"; fi;')
+        if int(shellTaxonomyCollected.read()):
             if verbose:
                 print(f'{tabulation}{yellow(name)}:')
                 ps(red('Already passed taxonomy collection'))
                 pe(magenta('Skipping organism'))
                 print()
 
-            shellTaxon = os.popen(f'cat {globalGenomesPath}/{accession}/taxonomy.status')
-            shellTaxonRead = shellTaxon.read().strip('\n')
-            shellTaxon.close()
+            shellTaxonomy = os.popen(f'cat {globalGenomesPath}/{accession}/taxonomy.status')
+            shellTaxonomyRead = shellTaxonomy.read().strip('\n')
+            shellTaxonomy.close()
 
-            taxonInfos[organismName] = readyInfos[organismName]
-            taxonInfos[organismName]['taxonomy'] = {}
-            taxonomyLines = shellTaxonRead.split(' > ')
+            taxonomyInfos[organismName] = readyInfos[organismName]
+            taxonomyInfos[organismName]['taxonomy'] = {}
+            taxonomyLines = shellTaxonomyRead.split(' > ')
             for line in taxonomyLines:
                 level, taxon, taxonId = line.split('<')
-                taxonInfos[organismName]['taxonomy'][level] = taxon
-                taxonInfos[organismName]['taxonomy'][f'{level}-id'] = taxonId
+                taxonomyInfos[organismName]['taxonomy'][level] = taxon
+                taxonomyInfos[organismName]['taxonomy'][f'{level}-id'] = taxonId
 
             found += 1
 
@@ -1317,10 +1346,10 @@ def taxonomyCollection(__readyFile=None, __taxonomyFile=None, verbose=1):
 
         try:
             created = 0
-            shellTaxon = os.popen(f'datasets summary taxonomy taxon "{taxId}" --as-json-lines 2>&1')
+            shellTaxonomy = os.popen(f'datasets summary taxonomy taxon "{taxId}" --as-json-lines 2>&1')
 
-            summaryRead = shellTaxon.read().replace('true', "'true'")[:-1]
-            shellTaxon.close()
+            summaryRead = shellTaxonomy.read().replace('true', "'true'")[:-1]
+            shellTaxonomy.close()
 
             if 'does not match any existing taxids' in summaryRead:
                 skipped += 1
@@ -1352,14 +1381,14 @@ def taxonomyCollection(__readyFile=None, __taxonomyFile=None, verbose=1):
                         pe(magenta('Skipping taxonomic level!'))
                         continue
                     else:
-                        shellTaxon.close()
+                        shellTaxonomy.close()
                         print(tabulation + red('ERROR:') + str(e))
                         sys.exit()
 
-                taxonInfos[organismName] = readyInfos[organismName]
-                taxonInfos[organismName]['taxonomy'] = {}
-                taxonInfos[organismName]['taxonomy'][level] = taxon
-                taxonInfos[organismName]['taxonomy'][f'{level}-id'] = taxonId
+                taxonomyInfos[organismName] = readyInfos[organismName]
+                taxonomyInfos[organismName]['taxonomy'] = {}
+                taxonomyInfos[organismName]['taxonomy'][level] = taxon
+                taxonomyInfos[organismName]['taxonomy'][f'{level}-id'] = taxonId
                 commandParts.append(f'{level}<{taxon}<{taxonId}')
 
                 if verbose:
@@ -1379,7 +1408,7 @@ def taxonomyCollection(__readyFile=None, __taxonomyFile=None, verbose=1):
                 pprint(red(f'Taxonomy collected!'))
                 print()
         except KeyboardInterrupt:
-            shellTaxon.close()
+            shellTaxonomy.close()
             shellCreateTaxon.close()
 
             shellDeleteTaxon = os.popen(f'rm {level}.status')
@@ -1388,7 +1417,7 @@ def taxonomyCollection(__readyFile=None, __taxonomyFile=None, verbose=1):
 
             sys.exit()
         except Exception as e:
-            shellTaxon.close()
+            shellTaxonomy.close()
             shellCreateTaxon.close()
 
             if created:
@@ -1399,7 +1428,7 @@ def taxonomyCollection(__readyFile=None, __taxonomyFile=None, verbose=1):
             print(tabulation + red('ERROR:') + str(e))
             sys.exit()
     
-    addToTaxonomyFile(taxonInfos, __taxonomyFile)
+    addToTaxonomyFile(taxonomyInfos, __taxonomyFile)
     print(
         f'{tabulation}{magenta(f"Taxonomy collection finished | ") + numberP(count) + magenta(" genomes processed, ") + numberP(found) + magenta(" found & ")
         + numberP(skipped) + magenta(" skipped"):^175}'
@@ -1464,8 +1493,9 @@ def collectRSSU(__detectedFile=None, __taxonomyFile=None, __rSSUFile=None, verbo
         print(tabulation + red('ERROR:') + str(e))
         sys.exit()
 
-    tot = 0
+    lost = 0
     found = 0
+    collected = 0
     rSSUInfos = {}
 
     for i, organismName in enumerate(taxonomyInfos, 1):
@@ -1479,12 +1509,32 @@ def collectRSSU(__detectedFile=None, __taxonomyFile=None, __rSSUFile=None, verbo
         if (verbose):            
             pprint(yellow(name) + ':')
 
+        shellSSUCollectedPlus = os.popen(f'if [ -e {globalGenomesPath}/{accession}/SSUSequence+.fasta ]; then echo "1"; else echo "0"; fi;')
+        shellSSUCollectedMinus = os.popen(f'if [ -e {globalGenomesPath}/{accession}/SSUSequence-.fasta ]; then echo "1"; else echo "0"; fi;')
+        if int(shellSSUCollectedPlus.read()):
+            if verbose:
+                ps(red('SSU already collected'))
+                pe(magenta('Skipping organism'))
+                print()
+
+            found += 1
+            rSSUInfos[organismName] = taxonomyInfos[organismName]
+            continue
+        elif int(shellSSUCollectedMinus.read()):
+            if verbose:
+                ps(red('Already marked as not found'))
+                pe(magenta('Skipping organism'))
+                print()
+
+            lost += 1
+            continue
+
         try:
-            shellCollectRSS = os.popen(f'grep "{taxId}" {rssFile}')
-            readCollectRSS = shellCollectRSS.read().replace('--\n', '')
-            shellCollectRSS.close()
+            shellCollectSSU = os.popen(f'grep "{taxId}" {rssFile}')
+            readCollectRSS = shellCollectSSU.read().replace('--\n', '')
+            shellCollectSSU.close()
         except KeyboardInterrupt:
-            shellCollectRSS.close()
+            shellCollectSSU.close()
             sys.exit()
         except Exception as e:
             print(tabulation + red('ERROR:') + str(e))
@@ -1492,31 +1542,69 @@ def collectRSSU(__detectedFile=None, __taxonomyFile=None, __rSSUFile=None, verbo
 
         if readCollectRSS != '':
             pprint(green('Found!'))
+            rSSUInfos[organismName] = taxonomyInfos[organismName]
 
             infos = readCollectRSS.split('\n')[0]
             sequence = infos.split('\t')[-1]
 
-            command = f'echo "{sequence}" > {globalGenomesPath}/{accession}/SSUSequence.fasta'
-            pprint(command)
-            sys.exit()
+            try:
+                shellAddSSU = os.popen(f'echo "{sequence}" > {globalGenomesPath}/{accession}/SSUSequence+.fasta')
+                _ = shellAddSSU.read()
+                shellAddSSU.close()
+            except KeyboardInterrupt:
+                shellAddSSU.close()
+                
+                shellRemoveSSU = os.popen(f'rm {globalGenomesPath}/{accession}/SSUSequence+.fasta')
+                _ = shellRemoveSSU.read()
+                shellRemoveSSU.close()
 
-            shellAddSSU = os.popen(command)
+                sys.exit()
+            except Exception as e:
+                shellAddSSU.close()
+                
+                shellRemoveSSU = os.popen(f'rm {globalGenomesPath}/{accession}/SSUSequence+.fasta')
+                _ = shellRemoveSSU.read()
+                shellRemoveSSU.close()
 
-            found += 1
+                print(tabulation + red('ERROR:') + str(e))
+                sys.exit()
+
+            collected += 1
         else:
             pprint(red('Not found!'))
-        tot += 1
+
+            try:
+                shellAddSSU = os.popen(f'> {globalGenomesPath}/{accession}/SSUSequence-.fasta')
+                _ = shellAddSSU.read()
+                shellAddSSU.close()
+            except KeyboardInterrupt:
+                shellAddSSU.close()
+                
+                shellRemoveSSU = os.popen(f'rm {globalGenomesPath}/{accession}/SSUSequence-.fasta')
+                _ = shellRemoveSSU.read()
+                shellRemoveSSU.close()
+
+                sys.exit()
+            except Exception as e:
+                shellAddSSU.close()
+                
+                shellRemoveSSU = os.popen(f'rm {globalGenomesPath}/{accession}/SSUSequence-.fasta')
+                _ = shellRemoveSSU.read()
+                shellRemoveSSU.close()
+
+                print(tabulation + red('ERROR:') + str(e))
+                sys.exit()
+
+            lost += 1
 
         if verbose:
             print()
 
-    pprint(yellow(f'{found}/{tot}'))
-    sys.exit()
-
     addToRSSUFile(rSSUInfos, __rSSUFile)
 
     print(
-        f'{tabulation}{magenta(f"rRNAs collection finished"):^120}'
+        f'{tabulation}{magenta(f"rRNAs (rSSU) collection finished | ") + numberP(len(detectedLines)) + magenta(" genomes processed, ") + numberP(collected)
+        + magenta(" collected, ") + numberP(found) + magenta(" found & ") + numberP(lost) + magenta(" lost"):^190}'
     )
     separator()
 
@@ -1558,8 +1646,7 @@ def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=Non
             'accession': splitted[0],
             'tax-id': splitted[2],
             'popular-name': popularName,
-            'chromosomes-folder': splitted[4],
-            'kingdom': splitted[5]
+            'chromosomes-folder': splitted[4]
         }
     
     taxonomyInfos = {}
