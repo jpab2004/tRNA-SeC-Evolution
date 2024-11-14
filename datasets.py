@@ -486,7 +486,7 @@ def addToMetadataFile(metadataInfos, __metadataFile=None):
         metadataFile = globalMetadataFile
 
     with open(metadataFile, 'a') as fileHandler:
-        firstLine = f'ID;taxID;tRNA-SeC number;score;{taxonsTextGeneral};{coloredTaxonsTextGeneral};{shapedTaxonsTextGeneral}\n'
+        firstLine = f'ID;taxID;tRNA-SeC number;rRNA type;score;{taxonsTextGeneral};{coloredTaxonsTextGeneral};{shapedTaxonsTextGeneral}\n'
         fileHandler.write(firstLine)
 
         for identification in metadataInfos:
@@ -494,6 +494,7 @@ def addToMetadataFile(metadataInfos, __metadataFile=None):
             taxonomy = metadataInfos[identification]['taxonomy']
             score = metadataInfos[identification]['score']
             tRNANumber = metadataInfos[identification]['trna-number']
+            rType = metadataInfos[identification]['rRNA-type']
 
             taxons = []
             for __level in globalTaxonLevels:
@@ -523,7 +524,7 @@ def addToMetadataFile(metadataInfos, __metadataFile=None):
             taxonsColorText = ';'.join(taxonsColors)
             taxonsShapeText = ';'.join(taxonsShapes)
 
-            text = f'{identification};{taxId};{tRNANumber};{score};{taxonsText};{taxonsColorText};{taxonsShapeText}\n'
+            text = f'{identification};{taxId};{tRNANumber};{rType};{score};{taxonsText};{taxonsColorText};{taxonsShapeText}\n'
 
             fileHandler.write(text)
 
@@ -1575,7 +1576,7 @@ def collectRSSU(__detectedFile=None, __taxonomyFile=None, __rSSUFile=None, verbo
             continue
 
         try:
-            shellCollectSSU = os.popen(f'grep "{taxId}" {rssFile}')
+            shellCollectSSU = os.popen(f'grep "\t{taxId}\t" {rssFile}')
             readCollectRSS = shellCollectSSU.read().replace('--\n', '')
             shellCollectSSU.close()
         except KeyboardInterrupt:
@@ -1585,15 +1586,32 @@ def collectRSSU(__detectedFile=None, __taxonomyFile=None, __rSSUFile=None, verbo
             print(tabulation + red('ERROR:') + str(e))
             sys.exit()
 
+        passed = 0
         if readCollectRSS != '':
-            pprint(green('Found!'))
             rSSUInfos[organismName] = taxonomyInfos[organismName]
 
-            infos = readCollectRSS.split('\n')[0]
-            sequence = infos.split('\t')[-1]
+            i = 1
+            passed = 1
+            rType = ''
+            allInfos = readCollectRSS.split('\n')
+            while ((not '18S' in rType) and (not '16S' in rType)):
+                if i >= len(allInfos):
+                    lost += 1
+                    passed = 0
+                    break
+
+                infos = readCollectRSS.split('\n')[0]
+                sequence = infos.split('\t')[-1]
+                rType = infos.split('\t')[5]
+                header = f'>{organismName};{rType}'
+
+                i += 1
+
+        if passed:
+            pprint(green('Found!'))
 
             try:
-                shellAddSSU = os.popen(f'echo "{sequence}" > {globalGenomesPath}/{accession}/SSUSequence+.fasta')
+                shellAddSSU = os.popen(f'echo "{header}\n{sequence}" > {globalGenomesPath}/{accession}/SSUSequence+.fasta')
                 _ = shellAddSSU.read()
                 shellAddSSU.close()
             except KeyboardInterrupt:
@@ -1615,7 +1633,11 @@ def collectRSSU(__detectedFile=None, __taxonomyFile=None, __rSSUFile=None, verbo
                 sys.exit()
 
             collected += 1
-        else:
+            if verbose:
+                print()
+
+            continue
+        else:    
             pprint(red('Not found!'))
 
             try:
@@ -1641,9 +1663,8 @@ def collectRSSU(__detectedFile=None, __taxonomyFile=None, __rSSUFile=None, verbo
                 sys.exit()
 
             lost += 1
-
-        if verbose:
-            print()
+            if verbose:
+                print()
 
     addToRSSUFile(rSSUInfos, __rSSUFile)
 
@@ -1758,8 +1779,11 @@ def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=Non
             shellDetected.close()
 
             shellRSSU = os.popen(f'cat {globalGenomesPath}/{accession}/SSUSequence+.fasta')
-            rSSUSequence = shellRSSU.read()
+            rSSUSequenceInfos = shellRSSU.read().split('\n')
             shellRSSU.close()
+
+            rName, rType = rSSUSequenceInfos[0].split(';')
+            rSSUSequence = rSSUSequenceInfos[1]
 
             if rSSUSequence == '':
                 if verbose:
@@ -1785,10 +1809,11 @@ def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=Non
                     chromosomePosition = headerInfos[1].split(':')[1]
                     strand, size, score = headerInfos[2], headerInfos[5], float(headerInfos[8])
 
+
                     if score > hScore:
                         hScore = score
                         headerFinal = f'>{index}'
-                        metadataInfos[headerFinal[1:]] = {'taxonomy': taxonomyInfos[organismName]['taxonomy'], 'tax-id': taxId, 'trna-number': j, 'score': score}
+                        metadataInfos[headerFinal[1:]] = {'taxonomy': taxonomyInfos[organismName]['taxonomy'], 'tax-id': taxId, 'trna-number': j, 'score': score, 'rRNA-type': rType}
                         processedInfos[organismName] = {'info': rSSUInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
                         processedRSSUInfos[organismName] = {'info': rSSUInfos[organismName], 'header': headerFinal, 'sequence': rSSUSequence}
 
