@@ -122,16 +122,6 @@ createdAlignRSSUFile = False
 globalTRNACount = None
 
 globalTaxonLevels = ['superkingdom', 'kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']
-globalTaxonLevelsCheat = {
-    'superkingdom': 'k',
-    'kingdom': None,
-    'phylum': 'p',
-    'class': 'c',
-    'order': 'o',
-    'family': 'f',
-    'genus': 'g',
-    'species': 's'
-}
 globalTaxonLevelsSequence = {
     'superkingdom': ['superkingdom'],
     'kingdom': ['superkingdom', 'kingdom'],
@@ -142,6 +132,11 @@ globalTaxonLevelsSequence = {
     'genus': ['superkingdom', 'kingdom', 'phylum', 'class', 'order', 'family', 'genus'],
     'species': ['superkingdom', 'kingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species'],
 }
+
+globalRSSUFileHeader = [
+    'primaryAccession', 'insdcAccession', 'location', 'cutoffHead', 'cutoffTail', 'type', 'evidence', 'evidenceDescription',
+    'sequenceQuality', 'alignmentQuality', 'subset', 'ncbiTaxId', 'reference', 'classification', 'silvaUri', 'sequence'
+]
 
 
 
@@ -187,6 +182,26 @@ def pathCheckCreation(path, returnPath=False, create=True):
     if returnPath:
         return os.getcwd()
     return
+
+def checkTaxonomyRSSU(organismName, allInfos, taxonomyInfos):
+    global globalTaxonLevels
+
+    for globalTaxon in globalTaxonLevels[::-1]:
+        if not globalTaxon in taxonomyInfos[organismName]['taxonomy']: continue
+        specificTaxon = taxonomyInfos[organismName]['taxonomy'][globalTaxon]['name']
+
+        for entry in allInfos:
+            entryInfos = allInfos[entry]
+            entryClassification = entryInfos['classification']
+            
+            if specificTaxon in entryClassification:
+                rType = entryInfos['type']
+                sequence = entryInfos['sequence']
+                header = f'>{organismName};{rType}'
+
+                return True, header, sequence
+    
+    return False, None, None
 
 
 
@@ -537,8 +552,9 @@ def addToMetadataFile(metadataInfos, __metadataFile=None):
 
 
 # Printing dictionaries
-def pretty(value, sort_keys=True, indent=4, colorOrder=[green, blue, red, cyan, yellow, magenta]):
+def pretty(value, sort_keys=True, indent=4, colorOrder=[green, blue, red, cyan, yellow, magenta], colorOffset=0):
     color = deque(colorOrder)
+    color.rotate(colorOffset)
     
     dump = str(repr(dumps(value, sort_keys=sort_keys, indent=indent))).split(r'\n')
     for packet in dump:
@@ -1490,7 +1506,7 @@ def taxonomyCollection(__readyFile=None, __taxonomyFile=None, verbose=1):
 
 
 def collectRSSU(__detectedFile=None, __taxonomyFile=None, __rSSUFile=None, verbose=1, rssFile='SILVA_138.2_SSURef.rnac'):
-    global globalTaxonLevelsCheat, globalGenomesPath
+    global globalGenomesPath
     
     if __detectedFile == None:
         global globalDetectedFile
@@ -1549,7 +1565,6 @@ def collectRSSU(__detectedFile=None, __taxonomyFile=None, __rSSUFile=None, verbo
     found = 0
     collected = 0
     rSSUInfos = {}
-
     for i, organismName in enumerate(taxonomyInfos, 1):
         popularName = taxonomyInfos[organismName]['popular-name']
         accession = taxonomyInfos[organismName]['accession']
@@ -1592,29 +1607,20 @@ def collectRSSU(__detectedFile=None, __taxonomyFile=None, __rSSUFile=None, verbo
             print(tabulation + red('ERROR:') + str(e))
             sys.exit()
 
-        passed = 0
+        result = False
         if readCollectRSS != '':
-            rSSUInfos[organismName] = taxonomyInfos[organismName]
+            rawAllInfos = readCollectRSS.split('\n')[:-1]
+            
+            allInfos = {}
+            for j, entry in enumerate(rawAllInfos):
+                splitted = entry.split('\t')
+                allInfos[j] = {globalRSSUFileHeader[k]: splitted[k] for k in range(len(globalRSSUFileHeader))}
 
-            i = 1
-            passed = 1
-            rType = ''
-            allInfos = readCollectRSS.split('\n')
-            while ((not '18S' in rType) and (not '16S' in rType)):
-                if i >= len(allInfos):
-                    lost += 1
-                    passed = 0
-                    break
-
-                infos = readCollectRSS.split('\n')[0]
-                sequence = infos.split('\t')[-1]
-                rType = infos.split('\t')[5]
-                header = f'>{organismName};{rType}'
-
-                i += 1
-
-        if passed:
+            result, header, sequence = checkTaxonomyRSSU(organismName, allInfos, taxonomyInfos)
+            
+        if result:
             pprint(green('Found!'))
+            rSSUInfos[organismName] = taxonomyInfos[organismName]
 
             try:
                 shellAddSSU = os.popen(f'echo "{header}\n{sequence}" > {globalGenomesPath}/{accession}/SSUSequence+.fasta')
@@ -1639,10 +1645,6 @@ def collectRSSU(__detectedFile=None, __taxonomyFile=None, __rSSUFile=None, verbo
                 sys.exit()
 
             collected += 1
-            if verbose:
-                print()
-
-            continue
         else:    
             pprint(red('Not found!'))
 
@@ -1669,8 +1671,9 @@ def collectRSSU(__detectedFile=None, __taxonomyFile=None, __rSSUFile=None, verbo
                 sys.exit()
 
             lost += 1
-            if verbose:
-                print()
+
+        if verbose:
+            print()
 
     addToRSSUFile(rSSUInfos, __rSSUFile)
 
