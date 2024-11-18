@@ -62,21 +62,26 @@ globalTaxonColors['kingdom']['Viridiplantae'] = f'#3A943A'
 # Micoreact shapes
 allAvailableShapes = [
     "circle", "diamond", "dot", "heptagon", "heptagon-inverted", "heptagram", "heptagram-inverted", "hexagon", "hexagram", "octagon", "octagram", "pentagon",
-    "pentagon-inverted", "pentagram", "pentagram-inverted", "plus", "cross", "square", "star", "tetragram", "triangle", "triangle-inverted", "triangle-right",
+    "pentagon-inverted", "pentagram", "pentagram-inverted", "plus", "square", "star", "tetragram", "triangle", "triangle-inverted", "triangle-right",
     "triangle-left", "chevron", "double-chevron", "chevron-inverted", "double-chevron-inverted", "chevron-right", "double-chevron-right", "chevron-left",
     "double-chevron-left", "wye", "wye-inverted"
 ]
-shapeCircle = 'circle'
-shapeDiamond = 'diamond'
-shapeSquare = 'square'
 shapeNone = 'cross'
 
 globalTaxonShapes = defaultdict(lambda: defaultdict(lambda: None))
 globalTaxonShapes['None'] = shapeNone
 
-globalTaxonShapes['superkingdom']['Archaea'] = shapeSquare
-globalTaxonShapes['superkingdom']['Bacteria'] = shapeCircle
-globalTaxonShapes['superkingdom']['Eukaryota'] = shapeDiamond
+globalTaxonShapes['superkingdom']['Archaea'] = 'square'
+globalTaxonShapes['superkingdom']['Bacteria'] = 'circle'
+globalTaxonShapes['superkingdom']['Eukaryota'] = 'diamond'
+
+
+
+# Microreact infos to add
+globalMetadataInfos = {
+    'colored': ['superkingdom', 'kingdom', 'phylum'],
+    'shaped': ['superkingdom']
+}
 
 
 
@@ -467,10 +472,10 @@ def addToTaxonomyFile(taxonInfos, __taxonomyFile=None):
             fileHandler.write(f'{accession} > {name} > {taxId} > {popularName} > {chromosomesFolderPath} > {command}\n')
 
 def addToMetadataFile(metadataInfos, __metadataFile=None):
-    global globalTaxonLevels, globalTaxonColors, globalMetadataFile
+    global globalTaxonLevels, globalTaxonColors, globalMetadataFile, globalMetadataInfos
     
-    coloredTaxons = ['superkingdom', 'kingdom', 'phylum']
-    shapedTaxons = ['superkingdom', 'kingdom']
+    coloredTaxons = globalMetadataInfos['colored']
+    shapedTaxons = globalMetadataInfos['shaped']
 
     taxonsTextGeneral = ';'.join(globalTaxonLevels)
     coloredTaxonsTextGeneral = ';'.join([f'{cTaxon}__color' for cTaxon in coloredTaxons])
@@ -486,15 +491,16 @@ def addToMetadataFile(metadataInfos, __metadataFile=None):
         metadataFile = globalMetadataFile
 
     with open(metadataFile, 'a') as fileHandler:
-        firstLine = f'ID;taxID;tRNA-SeC number;rRNA type;score;{taxonsTextGeneral};{coloredTaxonsTextGeneral};{shapedTaxonsTextGeneral}\n'
+        firstLine = f'ID;taxID;tRNA-SeC number;rRNA type;Mitochondrial rRNA;score;{taxonsTextGeneral};{coloredTaxonsTextGeneral};{shapedTaxonsTextGeneral}\n'
         fileHandler.write(firstLine)
 
         for identification in metadataInfos:
             taxId = metadataInfos[identification]['tax-id']
             taxonomy = metadataInfos[identification]['taxonomy']
             score = metadataInfos[identification]['score']
-            tRNANumber = metadataInfos[identification]['trna-number']
+            tRNANumber = metadataInfos[identification]['tRNA-number']
             rType = metadataInfos[identification]['rRNA-type']
+            mitochondrial = metadataInfos[identification]['mitochondrial']
 
             taxons = []
             for __level in globalTaxonLevels:
@@ -524,7 +530,7 @@ def addToMetadataFile(metadataInfos, __metadataFile=None):
             taxonsColorText = ';'.join(taxonsColors)
             taxonsShapeText = ';'.join(taxonsShapes)
 
-            text = f'{identification};{taxId};{tRNANumber};{rType};{score};{taxonsText};{taxonsColorText};{taxonsShapeText}\n'
+            text = f'{identification};{taxId};{tRNANumber};{rType};{mitochondrial};{score};{taxonsText};{taxonsColorText};{taxonsShapeText}\n'
 
             fileHandler.write(text)
 
@@ -1676,7 +1682,7 @@ def collectRSSU(__detectedFile=None, __taxonomyFile=None, __rSSUFile=None, verbo
 
 
 
-def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=None, __processedRSSUFile=None, __metadataFile=None, highestScore=1, verbose=1):
+def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=None, __processedRSSUFile=None, __metadataFile=None, verbose=1):
     global globalTRNACount, globalTaxonLevels, globalGenomesPath
 
 
@@ -1736,7 +1742,6 @@ def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=Non
 
 
 
-    index = 1
     count = 0
     tRNAs = 0
     skipped = 0
@@ -1774,28 +1779,32 @@ def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=Non
             continue
 
         try:
-            shellDetected = os.popen(f'cat *.hits | grep "SeC" -A 2')
-            detectedTRNAs = shellDetected.read()[:-1].replace('--\n', '').split('>')[1:]
-            shellDetected.close()
+            shellReads = os.popen('grep "SeC" *.hits -l')
+            filesToRead = shellReads.read()[:-1].split('\n')
+            shellReads.close()
 
-            shellRSSU = os.popen(f'cat {globalGenomesPath}/{accession}/SSUSequence+.fasta')
-            rSSUSequenceInfos = shellRSSU.read().split('\n')
-            shellRSSU.close()
+            hScore = 0
 
-            rName, rType = rSSUSequenceInfos[0].split(';')
-            rSSUSequence = rSSUSequenceInfos[1]
+            for fileToRead in filesToRead:
+                shellDetected = os.popen(f'grep "SeC" "{fileToRead}" -A 2')
+                detectedTRNAs = shellDetected.read()[:-1].replace('--\n', '').split('>')[1:]
+                shellDetected.close()
 
-            if rSSUSequence == '':
-                if verbose:
-                    ps(red('Could not find rSSU sequence!'))
-                    pe(cyan('Skipping organism'))
-                    print()
+                shellRSSU = os.popen(f'cat {globalGenomesPath}/{accession}/SSUSequence+.fasta')
+                rSSUSequenceInfos = shellRSSU.read().split('\n')
+                shellRSSU.close()
 
-                skipped += 1
-                continue
+                rName, rType = rSSUSequenceInfos[0].split(';')
+                rSSUSequence = rSSUSequenceInfos[1]
 
-            if highestScore:
-                hScore = 0
+                if rSSUSequence == '':
+                    if verbose:
+                        ps(red('Could not find rSSU sequence!'))
+                        pe(cyan('Skipping organism'))
+                        print()
+
+                    skipped += 1
+                    continue
 
                 for j, aux in enumerate(detectedTRNAs, 1):
                     part = aux.split('\n')
@@ -1809,35 +1818,21 @@ def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=Non
                     chromosomePosition = headerInfos[1].split(':')[1]
                     strand, size, score = headerInfos[2], headerInfos[5], float(headerInfos[8])
 
-
                     if score > hScore:
                         hScore = score
-                        headerFinal = f'>{index}'
-                        metadataInfos[headerFinal[1:]] = {'taxonomy': taxonomyInfos[organismName]['taxonomy'], 'tax-id': taxId, 'trna-number': j, 'score': score, 'rRNA-type': rType}
-                        processedInfos[organismName] = {'info': rSSUInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
+                        headerFinal = f'>{i}'
+
                         processedRSSUInfos[organismName] = {'info': rSSUInfos[organismName], 'header': headerFinal, 'sequence': rSSUSequence}
-
-                tRNAs += 1
-                index += 1
-            else:
-                for j, aux in enumerate(detectedTRNAs, 1):
-                    part = aux.split('\n')
-                    headerInfos = part[0].split(' ')
-                    tRNASequence = ''.join(part[1:])
-
-                    if tRNASequence == '':
-                        continue
-
-                    chromosomeState, chromosomeNumber, tRNANumber = headerInfos[0][1:].split('.')
-                    chromosomePosition = headerInfos[1].split(':')[1]
-                    strand, size, score = headerInfos[2], headerInfos[5], headerInfos[8]
-
-                    headerFinal = f'>{index}'
-                    metadataInfos[headerFinal[1:]] = {'taxonomy': taxonomyInfos[organismName]['taxonomy'], 'tax-id': taxId, 'trna-number': j}
-                    processedInfos[f'{organismName}.{j}'] = {'info': rSSUInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
-
+                        processedInfos[organismName] = {'info': rSSUInfos[organismName], 'header': headerFinal, 'sequence': tRNASequence}
+                        metadataInfos[headerFinal[1:]] = {
+                            'taxonomy': taxonomyInfos[organismName]['taxonomy'],
+                            'mitochondrial': 'MT' in fileToRead,
+                            'rRNA-type': rType,
+                            'tRNA-number': j,
+                            'tax-id': taxId,
+                            'score': score
+                        }
                     tRNAs += 1
-                    index += 1
             count += 1
         except KeyboardInterrupt:
             shellDetected.close()

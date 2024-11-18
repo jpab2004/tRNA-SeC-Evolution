@@ -67,7 +67,6 @@ parser.add_argument('--range-step', help='The step of the range.')
 
 parser.add_argument('--re-download', help='Force re download of genomes.', action='store_true')
 parser.add_argument('--refseq', help='Use RefSeq expanded search.', action='store_true')
-parser.add_argument('--all-scores', help='Use all the tRNA-SeC, independent of score search.', action='store_false')
 parser.add_argument('--show-MAFFT-progress', help='Wether or not to show the progress for MAFFT alignment.', action='store_true')
 
 parser.add_argument('--quiet', help='Quiet printing.', action='store_false')
@@ -90,7 +89,6 @@ parser.add_argument('--suppress-taxonomy', help='Suppress taxonomy process.', ac
 parser.add_argument('--suppress-taxana', help='Suppress taxonomy analysis process.', action='store_false')
 parser.add_argument('--suppress-rRNAs-collection', help='Suppress rRNAsmallsubunit collection.', action='store_false')
 parser.add_argument('--suppress-align', help='Suppress MAFFT alignment.', action='store_false')
-parser.add_argument('--suppress-metadata', help='Suppress metadata process.', action='store_false')
 
 args=parser.parse_args()
 
@@ -121,7 +119,6 @@ rangeStep = int(args.range_step) if args.range_step != None else 1
 
 reDownload = args.re_download
 refseq = args.refseq
-highestScore = args.all_scores
 
 quiet = args.quiet
 if not quiet:
@@ -154,7 +151,6 @@ suppressTaxonomy = args.suppress_taxonomy
 suppressTaxonAnalysis = args.suppress_taxana
 suppressRSSU = args.suppress_rRNAs_collection
 suppressAlign = args.suppress_align
-suppressMetadata = args.suppress_metadata
 
 
 
@@ -162,21 +158,17 @@ suffix = ''
 if referenceRange != None:
     suffix = f'_{referenceRange}*{rangeStep}'
 
-suffixScore = ''
-if not highestScore:
-    suffixScore = '_all_scores'
-
 files = {
     '__genomesPath': genomesPath,
     '__fetchFile': fetchFile + suffix,
     '__readyFile': readyFile + suffix,
     '__detectedFile': detectedFile + suffix,
-    '__processedFile': processedFile + suffix + suffixScore,
-    '__processedRSSUFile': processedRSSUFile + suffix + suffixScore,
-    '__alignFile': alignFile + suffixScore,
-    '__alignRSSUFile': alignRSSUFile + suffixScore,
+    '__processedFile': processedFile + suffix,
+    '__processedRSSUFile': processedRSSUFile + suffix,
+    '__alignFile': alignFile,
+    '__alignRSSUFile': alignRSSUFile,
     '__taxonomyFile': taxonomyFile,
-    '__metadataFile': metadataFile + suffixScore,
+    '__metadataFile': metadataFile,
 
     'suppressDownload': not suppressDownload,
     'suppressFetch': not suppressFetch,
@@ -196,7 +188,7 @@ if suppressScan: trnaScanSE(verbose=verboseScan)
 if suppressDetected: findDetectedSeC(verbose=verboseDetected)
 if suppressTaxonomy: taxonomyCollection(verbose=verboseTaxonomy)
 if suppressRSSU: collectRSSU(verbose=verboseRRS)
-if suppressProcess: processAndMetadata(highestScore=highestScore, verbose=verboseProcess)
+if suppressProcess: processAndMetadata(verbose=verboseProcess)
 if suppressTaxonAnalysis: taxonAnalysis(taxonLevel, verbose=verboseTaxonAnalysis, sequential=sequentialAnalysis, debug=0)
 
 if ((referenceRange == None) and (suppressAlign)):
