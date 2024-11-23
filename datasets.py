@@ -1,9 +1,16 @@
 # Imports
 from collections import defaultdict, deque
+import matplotlib.pyplot as plt
 from termcolor import colored
+from textwrap import wrap
 import os, sys, glob, ast
 from json import dumps
 import random, pickle
+
+
+
+# import warnings
+# warnings.filterwarnings( "ignore", module = ".*matplotlib.*" )
 
 
 
@@ -31,7 +38,8 @@ peT = lambda x: print(x)
 psTaxa = lambda: print(tabulation, end='', flush=True)
 pmTaxa = lambda x: print(f'{x} -> ', end='', flush=True)
 
-randomColor = lambda: '#' + ''.join([random.choice('0123456789ABCDEF') for _ in range(6)])
+# randomColor = lambda: '#' + ''.join([random.choice('0123456789ABCDEF') for _ in range(6)])
+randomColor = lambda: '#' + ''.join([random.choice('789ABCDEF') for _ in range(6)])
 randomShape = lambda: random.choice(allAvailableShapes)
 
 
@@ -202,6 +210,97 @@ def checkTaxonomyRSSU(organismName, allInfos, taxonomyInfos):
                 return True, header, sequence
     
     return False, None, None
+
+def addColors(c1, c2):
+    c1 = wrap(c1.replace('#', ''), 2)
+    c2 = wrap(c2.replace('#', ''), 2)
+    
+    c1 = [int(c, 16) for c in c1]
+    c2 = [int(c, 16) for c in c2]
+
+    color = [int((c1[i] + c2[i])/2) for i in range(len(c1))]
+    color = '#' + ''.join([f'{c:0{2}x}' for c in color])
+
+    return color
+
+def plotTaxonAnalysis(taxonAnalysis, levels, sequential=False, totalColor='#999999', colorWeight='#222222', unique=False, show=False):
+    def annotateAx(taxon, found, total, percentage, i, c1, c2):
+        # edgeColor, lineWidth = '#ffffff', 3
+        edgeColor, lineWidth = '#000000', 1
+
+        ax.bar(taxon, found, color=c2, bottom=0, edgecolor=edgeColor, linewidth=lineWidth)
+        ax.bar(taxon, total-found, color=c1, bottom=found, edgecolor=edgeColor, linewidth=lineWidth)
+
+        totalY = total + .15*total
+        if len(taxons) / fig.get_figwidth() < 1.5:
+            ax.annotate(f'{percentage}%', (i, totalY), ha='center', va='center', rotation=0)
+            return False
+        else:
+            if percentage > 95:
+                ax.annotate('*', (i, totalY), ha='center', va='center', rotation=0)
+                return True
+            if percentage <= 0:
+                ax.annotate('*', (i, totalY), ha='center', va='center', rotation=0, color='#ff0000')
+                return True
+
+    global globalTaxonColors
+    figs, axes = [], []
+
+    for level in levels:
+        annotated = False
+        fig, ax = plt.subplots(1, 1, figsize=(16, 6), dpi=100)
+
+        taxons = list(taxon for taxon in taxonAnalysis[level] if not taxon in ['found', 'total', 'percentage', 'counted'])
+        taxons = sorted(taxons, key=lambda x: taxonAnalysis[level][x]['total'] + .1*taxonAnalysis[level][x]['found'], reverse=True)
+
+        found = taxonAnalysis[level]['found']
+        total = taxonAnalysis[level]['total']
+        percentage = taxonAnalysis[level]['percentage']
+        annotated = True if annotateAx('Total', found, total, percentage, 0, totalColor, addColors(totalColor, colorWeight)) else annotated
+        
+
+        for i, taxon in enumerate(taxons, 1):
+            if not taxon in globalTaxonColors[level]:
+                globalTaxonColors[level][taxon] = randomColor()
+            color = globalTaxonColors[level][taxon]
+            colorFound = addColors(color, colorWeight)
+
+            found = taxonAnalysis[level][taxon]['found']
+            total = taxonAnalysis[level][taxon]['total']
+            percentage = taxonAnalysis[level][taxon]['percentage']
+            annotated = True if annotateAx(taxon, found, total, percentage, i, color, colorFound) else annotated
+
+        ax.set_yscale('log')
+        ax.set_ylim([.5, 1.5*ax.get_ylim()[1]])
+        
+        rot = 90 if len(taxons) / fig.get_figwidth() > 1.5 else 0
+        ax.tick_params(axis='x', labelrotation=rot)
+        
+        ax.set_xlabel(level[0].upper() + level[1:], fontweight='bold')
+        org = 'species' if unique else 'organisms'
+        ax.set_ylabel(f'Number of tRNA-SeC (log)', fontweight='bold')
+        ax.set_title(f'Number of tRNA-SeC per taxon ({org})', fontweight='bold')
+
+        if annotated:
+            ax.plot([], [], label='*: 0% of total', color='#ffffff')
+            ax.plot([], [], label='*: > 95% of total', color='#ffffff')
+            legTxts = ax.legend().get_texts()
+            legTxts[0].set_color('#ff0000')
+
+        fig.tight_layout()
+        if ((show) and (sequential)):
+            plt.show()
+
+        pathCheckCreation(f'{globalGenomesPath}/figs')
+        fig.savefig(f'{globalGenomesPath}/figs/{level}_{org}.png', format='png')
+
+        figs.append(fig)
+        axes.append(ax)
+    
+    if ((show) and (not sequential)):
+        plt.show()
+    
+    return
 
 
 
@@ -552,7 +651,7 @@ def addToMetadataFile(metadataInfos, __metadataFile=None):
 
 
 # Printing dictionaries
-def pretty(value, sort_keys=True, indent=4, colorOrder=[green, blue, red, cyan, yellow, magenta], colorOffset=0):
+def pretty(value, sort_keys=True, indent=4, colorOrder=[green, blue, red, cyan, yellow, magenta], colorOffset=False):
     color = deque(colorOrder)
     color.rotate(colorOffset)
     
@@ -571,7 +670,7 @@ def pretty(value, sort_keys=True, indent=4, colorOrder=[green, blue, red, cyan, 
 
 
 # Collection of organism data (accession and assembly level)
-def collectInfo(taxons, verbose=1, archaea=0, save=0, read=0, __speciesFile=None):
+def collectInfo(taxons, verbose=True, archaea=False, save=False, read=False, __speciesFile=None):
     species = defaultdict(lambda: {'accession': None})
 
     if __speciesFile == None:
@@ -657,9 +756,9 @@ def downloadGenomes(
         __fetchFile=None,
         referenceRange=None,
         rangeStep=None,
-        verbose=1,
-        reDownload=0,
-        progressbar=0,
+        verbose=True,
+        reDownload=False,
+        progressbar=False,
         sizeLimit=15,
         zipFile='genome',
         fetchFolder='fetchFolder',
@@ -900,7 +999,7 @@ def downloadGenomes(
 
 
 
-def downloadFetch(__fetchFile=None, __readyFile=None, verbose=1, progressbar=0):
+def downloadFetch(__fetchFile=None, __readyFile=None, verbose=True, progressbar=False):
     if __fetchFile == None:
         global globalFetchFile
         fetchFile = globalFetchFile
@@ -1031,7 +1130,7 @@ def downloadFetch(__fetchFile=None, __readyFile=None, verbose=1, progressbar=0):
 
 
 
-def trnaScanSE(__readyFile=None, verbose=1, recycle=1):
+def trnaScanSE(__readyFile=None, verbose=True, recycle=True):
     if __readyFile == None:
         global globalReadyFile
         readyFile = globalReadyFile
@@ -1141,7 +1240,7 @@ def trnaScanSE(__readyFile=None, verbose=1, recycle=1):
             if recycle:
                 shellBig = os.popen(f'if [ -e {globalGenomesPath}/{accession}/fetched.status ]; then echo "1"; else echo "0"; fi;')
                 bigFile = int(shellBig.read())
-                recycleFile(None, recycleAll=1, big=bigFile)
+                recycleFile(None, recycleAll=True, big=bigFile)
 
                 if verbose:
                     pprint(magenta('Everything recycled'))
@@ -1185,7 +1284,7 @@ def trnaScanSE(__readyFile=None, verbose=1, recycle=1):
 
 
 
-def recycleFile(recycleFile, recycleAll=0, big=0):
+def recycleFile(recycleFile, recycleAll=False, big=False):
     if recycleFile != None:
         shellRecycle = os.popen(f'rm {recycleFile}')
         _ = shellRecycle.read()
@@ -1207,7 +1306,7 @@ def recycleFile(recycleFile, recycleAll=0, big=0):
 
 
 
-def findDetectedSeC(__readyFile=None, __detectedFile=None, verbose=1):
+def findDetectedSeC(__readyFile=None, __detectedFile=None, verbose=True):
     if __readyFile == None:
         global globalReadyFile
         readyFile = globalReadyFile
@@ -1331,7 +1430,7 @@ def findDetectedSeC(__readyFile=None, __detectedFile=None, verbose=1):
 
 
 
-def taxonomyCollection(__readyFile=None, __taxonomyFile=None, verbose=1):
+def taxonomyCollection(__readyFile=None, __taxonomyFile=None, verbose=True):
     global globalTaxonLevels
 
     if __readyFile == None:
@@ -1505,7 +1604,7 @@ def taxonomyCollection(__readyFile=None, __taxonomyFile=None, verbose=1):
 
 
 
-def collectRSSU(__detectedFile=None, __taxonomyFile=None, __rSSUFile=None, verbose=1, rssFile='SILVA_138.2_SSURef.rnac'):
+def collectRSSU(__detectedFile=None, __taxonomyFile=None, __rSSUFile=None, verbose=True, rssFile='SILVA_138.2_SSURef.rnac'):
     global globalGenomesPath
     
     if __detectedFile == None:
@@ -1685,7 +1784,7 @@ def collectRSSU(__detectedFile=None, __taxonomyFile=None, __rSSUFile=None, verbo
 
 
 
-def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=None, __processedRSSUFile=None, __metadataFile=None, verbose=1):
+def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=None, __processedRSSUFile=None, __metadataFile=None, verbose=True):
     global globalTRNACount, globalTaxonLevels, globalGenomesPath
 
 
@@ -1862,7 +1961,7 @@ def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=Non
 
 
 
-def taxonAnalysis(__level='all', __taxonomyFile=None, __detectedFile=None, verbose=1, debug=0, sequential=False):
+def taxonAnalysisFunc(__level='all', __taxonomyFile=None, __detectedFile=None, verbose=True, debug=False, sequential=False, plot=False):
     if __taxonomyFile == None:
         global globalTaxonomyFile
         taxonomyFile = globalTaxonomyFile
@@ -1924,6 +2023,8 @@ def taxonAnalysis(__level='all', __taxonomyFile=None, __detectedFile=None, verbo
 
     print(f'{tabulation}{magenta(f"Taxon ({__level}) analysis starting" + " | " + numberP(len(taxonLines)) + magenta(" genomes")):^140}\n')
     taxonAnalysis = defaultdict(lambda: {'total': 0, 'found': 0, 'percentage': None})
+    taxonAnalysisUnique = defaultdict(lambda: {'total': 0, 'found': 0, 'percentage': None})
+    taxonAnalysisUniqueCount = {'total': {}, 'found': {}}
     totalIndexing = len(list(taxonInfos.keys()))
     indexingSize = len(str(totalIndexing))
     for i, organismName in enumerate(taxonInfos, 1):
@@ -1941,8 +2042,11 @@ def taxonAnalysis(__level='all', __taxonomyFile=None, __detectedFile=None, verbo
             psTaxa()
 
         for i, level in enumerate(levels, 1):
-            if not level in taxonInfos[organismName]['taxonomy']: continue
-            taxon = taxonInfos[organismName]['taxonomy'][level]
+            if not level in taxonInfos[organismName]['taxonomy']:
+                taxon = 'None'
+            else:
+                taxon = taxonInfos[organismName]['taxonomy'][level]
+            
             if verbose:
                 if i == len(levels):
                     print(cyan(taxon))
@@ -1951,12 +2055,30 @@ def taxonAnalysis(__level='all', __taxonomyFile=None, __detectedFile=None, verbo
             
             if not taxon in taxonAnalysis[level]:
                 taxonAnalysis[level][taxon] = {'total': 0, 'found': 0, 'percentage': None}
+                taxonAnalysisUnique[level][taxon] = {'total': 0, 'found': 0, 'percentage': None}
+                taxonAnalysisUniqueCount['total'][level] = []
+                taxonAnalysisUniqueCount['found'][level] = []
 
             taxonAnalysis[level]['total'] += 1
             taxonAnalysis[level][taxon]['total'] += 1
+
+            if not level in taxonAnalysisUniqueCount['total']:
+                taxonAnalysisUniqueCount['total'][level] = []
+            if not taxonInfos[organismName]['taxonomy']['species'] in taxonAnalysisUniqueCount['total'][level]:
+                taxonAnalysisUnique[level]['total'] += 1
+                taxonAnalysisUnique[level][taxon]['total'] += 1
+                taxonAnalysisUniqueCount['total'][level].append(taxonInfos[organismName]['taxonomy']['species'])
+
             if found:
                 taxonAnalysis[level]['found'] += 1
                 taxonAnalysis[level][taxon]['found'] += 1
+
+                if not level in taxonAnalysisUniqueCount['found']:
+                    taxonAnalysisUniqueCount['found'][level] = []
+                if not taxonInfos[organismName]['taxonomy']['species'] in taxonAnalysisUniqueCount['found'][level]:
+                    taxonAnalysisUnique[level]['found'] += 1
+                    taxonAnalysisUnique[level][taxon]['found'] += 1
+                    taxonAnalysisUniqueCount['found'][level].append(taxonInfos[organismName]['taxonomy']['species'])
 
         if verbose:
             print()
@@ -1964,32 +2086,51 @@ def taxonAnalysis(__level='all', __taxonomyFile=None, __detectedFile=None, verbo
 
     for level in levels:
         for phy in taxonAnalysis[level]:
-            if phy in ['found', 'total', 'percentage']:
+            if phy in ['found', 'total', 'percentage', 'counted']:
                 continue
 
             found = taxonAnalysis[level][phy]['found']
             total = taxonAnalysis[level][phy]['total']
-            percentage = f'{100 * (found / total):.2f}%'
+            percentage = round(100 * (found / total), 2)
             taxonAnalysis[level][phy]['percentage'] = percentage
 
         found = taxonAnalysis[level]['found']
         total = taxonAnalysis[level]['total']
-        percentage = f'{100 * (found / total):.2f}%'
+        percentage = round(100 * (found / total), 2)
         taxonAnalysis[level]['percentage'] = percentage
+
+    for level in levels:
+        for phy in taxonAnalysisUnique[level]:
+            if phy in ['found', 'total', 'percentage', 'counted']:
+                continue
+
+            found = taxonAnalysisUnique[level][phy]['found']
+            total = taxonAnalysisUnique[level][phy]['total']
+            percentage = round(100 * (found / total), 2)
+            taxonAnalysisUnique[level][phy]['percentage'] = percentage
+
+        found = taxonAnalysisUnique[level]['found']
+        total = taxonAnalysisUnique[level]['total']
+        percentage = round(100 * (found / total), 2)
+        taxonAnalysisUnique[level]['percentage'] = percentage
 
     if ((debug) or (__level != 'all')):
         pretty(taxonAnalysis)
+        pretty(taxonAnalysisUnique)
         if verbose:
             print()
 
+    plotTaxonAnalysis(taxonAnalysis, levels, unique=False, show=plot)
+    plotTaxonAnalysis(taxonAnalysisUnique, levels, unique=True, show=plot)
+
     print(
-        f'{tabulation}{magenta(f"Taxon ({__level}) analysis finished"):^120}'
+        f'{tabulation}{magenta(f"Taxon ({', '.join(levels)}) analysis finished"):^120}'
     )
     separator()
 
 
 
-def alignMAFFT(__processedFile=None, __processedRSSUFile=None, __alignFile=None, __alignRSSUFile=None, progress=0, verbose=1):
+def alignMAFFT(__processedFile=None, __processedRSSUFile=None, __alignFile=None, __alignRSSUFile=None, progress=False, verbose=True):
     global globalTRNACount
 
     if globalTRNACount == None: tRNACount = red('UNDEFINED!')

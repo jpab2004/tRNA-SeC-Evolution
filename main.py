@@ -1,4 +1,4 @@
-from datasets import collectInfo, downloadGenomes, downloadFetch, trnaScanSE, findDetectedSeC, processAndMetadata, alignMAFFT, taxonomyCollection, taxonAnalysis, collectRSSU
+from datasets import collectInfo, downloadGenomes, downloadFetch, trnaScanSE, findDetectedSeC, processAndMetadata, alignMAFFT, taxonomyCollection, taxonAnalysisFunc, collectRSSU
 from datasets import initiate, pretty
 import os, argparse, sys
 
@@ -68,6 +68,7 @@ parser.add_argument('--range-step', help='The step of the range.')
 parser.add_argument('--re-download', help='Force re download of genomes.', action='store_true')
 parser.add_argument('--refseq', help='Use RefSeq expanded search.', action='store_true')
 parser.add_argument('--show-MAFFT-progress', help='Wether or not to show the progress for MAFFT alignment.', action='store_true')
+parser.add_argument('--plot-analysis', help='Wether or not to plot the taxonomic analysis', action='store_true')
 
 parser.add_argument('--quiet', help='Quiet printing.', action='store_false')
 parser.add_argument('--q-download', help='Quiet for download.', action='store_false')
@@ -113,6 +114,7 @@ taxonNames = eval(args.taxon_names) if args.taxon_names != None else __taxonName
 taxonLevel = args.taxon_level if args.taxon_level != None else 'all'
 sequentialAnalysis = args.sequential
 showAlign = args.show_MAFFT_progress
+plotAnalysis = args.plot_analysis
 
 referenceRange = int(args.reference_range) if args.reference_range != None else None
 rangeStep = int(args.range_step) if args.range_step != None else 1
@@ -122,15 +124,15 @@ refseq = args.refseq
 
 quiet = args.quiet
 if not quiet:
-    verboseDownload = 0
-    verboseFetch = 0
-    verboseScan = 0
-    verboseDetected = 0
-    verboseProcess = 0
-    verboseTaxonomy = 0
-    verboseTaxonAnalysis = 0
-    verboseRRS = 0
-    verboseAl = 0
+    verboseDownload = False
+    verboseFetch = False
+    verboseScan = False
+    verboseDetected = False
+    verboseProcess = False
+    verboseTaxonomy = False
+    verboseTaxonAnalysis = False
+    verboseRRS = False
+    verboseAl = False
 else:
     verboseDownload = args.q_download
     verboseFetch = args.q_fetch
@@ -189,7 +191,7 @@ if suppressDetected: findDetectedSeC(verbose=verboseDetected)
 if suppressTaxonomy: taxonomyCollection(verbose=verboseTaxonomy)
 if suppressRSSU: collectRSSU(verbose=verboseRRS)
 if suppressProcess: processAndMetadata(verbose=verboseProcess)
-if suppressTaxonAnalysis: taxonAnalysis(taxonLevel, verbose=verboseTaxonAnalysis, sequential=sequentialAnalysis, debug=0)
+if suppressTaxonAnalysis: taxonAnalysisFunc(taxonLevel, verbose=verboseTaxonAnalysis, sequential=sequentialAnalysis, debug=False, plot=plotAnalysis)
 
 if ((referenceRange == None) and (suppressAlign)):
     alignMAFFT(progress=showAlign, verbose=verboseAl)
