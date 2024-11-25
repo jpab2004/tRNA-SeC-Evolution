@@ -706,7 +706,7 @@ def collectInfo(taxons, verbose=True, archaea=False, save=False, read=False, __s
         speciesFile = __speciesFile + '.pickle'
 
     separator()
-    print(f'{tabulation}{magenta("Data collection starting"):^120}\n')
+    print(f'{tabulation}{magenta("Data collection starting"):^121}\n')
 
     if ((read) and (not save)):
         print(f'{tabulation}{green("Read flag detected") + " | " + magenta("Trying to read file"):^130}\n')
@@ -714,7 +714,7 @@ def collectInfo(taxons, verbose=True, archaea=False, save=False, read=False, __s
         with open(speciesFile, 'rb') as fileHandler:
             species = pickle.load(fileHandler)
 
-        print(f'{tabulation}{green("Read successful"):^120}')
+        print(f'{tabulation}{(green("Read successful (") + numberP(len(list(species.keys()))) + green(" genomes)")):^140}')
         separator()
     else:
         totalIndexing = len(list(taxons.keys()))
@@ -1298,13 +1298,9 @@ def trnaScanSE(__readyFile=None, verbose=True, recycle=True):
 
         os.chdir(globalGenomesPath)
 
-    shellGrepNumber = os.popen(f'cat {globalGenomesPath}/GCF_*/chromosomes/*.hits | grep "SeC" -c')
-    totalHits = int(shellGrepNumber.read())
-    shellGrepNumber.close()
-
     print(
-        f'{tabulation}{numberP(len(list(readyInfos.keys())) - found) + magenta(" genomes analysed and ") + numberP(totalHits) + magenta(" tRNA-SeCs found | ") +
-        numberP(found) + magenta(" already analysed & ") + numberP(skipped) + magenta(" skipped"):^180}'
+        f'{tabulation}{numberP(len(list(readyInfos.keys())) - found) + magenta(" genomes analysed | ") + numberP(found) +
+        magenta(" already analysed & ") + numberP(skipped) + magenta(" skipped"):^180}'
     )
     separator()
 
@@ -1356,6 +1352,7 @@ def findDetectedSeC(__readyFile=None, __detectedFile=None, verbose=True):
         }
 
     skipped = 0
+    totalTRNA = 0
     foundPlus = 0
     foundMinus = 0
     detectedPlus = 0
@@ -1376,6 +1373,11 @@ def findDetectedSeC(__readyFile=None, __detectedFile=None, verbose=True):
         if int(shellAlreadyDetectedPlus.read()):
             foundPlus += 1
             detectedInfos[organismName] = readyInfos[organismName]
+
+            shellDetected = os.popen(f'cat {globalGenomesPath}/{accession}/chromosomes/*.hits | grep "SeC" -c')
+            numberDetected = int(shellDetected.read())
+            shellDetected.close()
+            totalTRNA += numberDetected
 
             if verbose:
                 print(f'{tabulation}{yellow(name)}:')
@@ -1428,6 +1430,7 @@ def findDetectedSeC(__readyFile=None, __detectedFile=None, verbose=True):
         if numberDetected > 0:
             detectedInfos[organismName] = readyInfos[organismName]
             detectedPlus += numberDetected
+            totalTRNA += numberDetected
 
             shellTouch = os.popen('> "../detected+.status"')
             _ = shellTouch.read()
@@ -1447,10 +1450,10 @@ def findDetectedSeC(__readyFile=None, __detectedFile=None, verbose=True):
     addToDetectedFile(detectedInfos, __detectedFile)
 
     tempPassed = len(list(readyInfos.keys())) - foundPlus - foundMinus
+    print(f'{tabulation}{numberP(tempPassed) + magenta(" genomes passed detection and ") + numberP(detectedPlus) + magenta(" tRNAs-SeC were found"):^150}')
     print(
-        f'{tabulation}{numberP(tempPassed) + magenta(" genomes passed detection and ") + numberP(detectedPlus) + magenta(" tRNAs-SeC were found | ")
-        + numberP(foundPlus + foundMinus) + magenta(" already passed (") + numberP(foundPlus) + magenta("+ ") + numberP(foundMinus) + magenta("-) & ")
-        + numberP(skipped) + magenta(" skipped"):^220}'
+        f'{tabulation}{numberP(foundPlus + foundMinus) + magenta(" already passed (") + numberP(foundPlus) + magenta("+ ") + numberP(foundMinus) + magenta("-) & ")
+        + numberP(skipped) + magenta(" skipped | total tRNA-SeC found = ") + numberP(totalTRNA):^190}'
     )
     separator()
 
@@ -1672,7 +1675,7 @@ def collectRSSU(__detectedFile=None, __taxonomyFile=None, __rSSUFile=None, verbo
             level, name, taxId = info.split('<')
             taxonomyInfos[organismName]['taxonomy'][level] = {'name': name, 'tax-id': taxId}
 
-    print(f'{tabulation}{magenta(f"rRNAs collection starting" + " | " + numberP(len(detectedNames)) + magenta(" genomes")):^140}')
+    print(f'{tabulation}{magenta(f"rRNAs collection starting" + " | " + numberP(len(detectedNames)) + magenta(" genomes")):^140}\n')
     totalIndexing = len(list(taxonomyInfos.keys()))
     indexingSize = len(str(totalIndexing))
 
@@ -1873,6 +1876,7 @@ def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=Non
     count = 0
     tRNAs = 0
     skipped = 0
+    totalTRNAs = 0
     processedInfos = {}
     processedRSSUInfos = {}
     metadataInfos = {}
@@ -1925,6 +1929,8 @@ def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=Non
                 rName, rType = rSSUSequenceInfos[0].split(';')
                 rSSUSequence = rSSUSequenceInfos[1]
 
+                totalTRNAs += int(os.popen(f'grep "SeC" {fileToRead} -c').read().strip())
+
                 if rSSUSequence == '':
                     if verbose:
                         ps(red('Could not find rSSU sequence!'))
@@ -1947,6 +1953,7 @@ def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=Non
                     strand, size, score = headerInfos[2], headerInfos[5], float(headerInfos[8])
 
                     if score > hScore:
+                        if hScore == 0: tRNAs += 1
                         hScore = score
                         headerFinal = f'>{i}'
 
@@ -1960,7 +1967,6 @@ def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=Non
                             'tax-id': taxId,
                             'score': score
                         }
-                    tRNAs += 1
             count += 1
         except KeyboardInterrupt:
             shellDetected.close()
@@ -1977,11 +1983,10 @@ def processAndMetadata(__rSSUFile=None, __taxonomyFile=None, __processedFile=Non
     addToProcessedFile(processedInfos, __processedFile)
     addToProcessedRSSUFile(processedRSSUInfos, __processedRSSUFile)
     addToMetadataFile(metadataInfos, __metadataFile)
-    globalTRNACount = tRNAs
 
     print(
-        f'{tabulation}{magenta("tRNAs-SeC processing ended | ") + numberP(count) + magenta(" genomes processed (") + numberP(tRNAs) + magenta(" tRNAs-SeC) & ") +
-        numberP(skipped) + magenta(" skipped"):^175}'
+        f'{tabulation}{magenta("tRNAs-SeC processing ended | ") + numberP(count) + magenta(" genomes processed (") + numberP(tRNAs) + magenta("/") + numberP(totalTRNAs) +
+        magenta(" tRNAs-SeC) & ") + numberP(skipped) + magenta(" skipped"):^205}'
     )
     separator()
 
@@ -2140,14 +2145,15 @@ def taxonAnalysisFunc(__level='all', __taxonomyFile=None, __detectedFile=None, v
         percentage = round(100 * (found / total), 2)
         taxonAnalysisUnique[level]['percentage'] = percentage
 
-    if ((debug) or (__level != 'all')):
+    if (((debug) or (__level != 'all')) and (verbose)):
         pretty(taxonAnalysis)
         pretty(taxonAnalysisUnique)
         if verbose:
             print()
 
-    plotTaxonAnalysis(taxonAnalysis, levels, unique=False, show=plot)
-    plotTaxonAnalysis(taxonAnalysisUnique, levels, unique=True, show=plot)
+    if plot:
+        plotTaxonAnalysis(taxonAnalysis, levels, unique=False, show=plot)
+        plotTaxonAnalysis(taxonAnalysisUnique, levels, unique=True, show=plot)
 
     print(
         f'{tabulation}{magenta(f"Taxon ({', '.join(levels)}) analysis finished"):^120}'
@@ -2157,11 +2163,6 @@ def taxonAnalysisFunc(__level='all', __taxonomyFile=None, __detectedFile=None, v
 
 
 def alignMAFFT(__processedFile=None, __processedRSSUFile=None, __alignFile=None, __alignRSSUFile=None, progress=False, verbose=True):
-    global globalTRNACount
-
-    if globalTRNACount == None: tRNACount = red('UNDEFINED!')
-    else: tRNACount = numberP(globalTRNACount)
-
     if __processedFile == None:
         global globalProcessedFile
         processedFile = globalProcessedFile
@@ -2186,7 +2187,9 @@ def alignMAFFT(__processedFile=None, __processedRSSUFile=None, __alignFile=None,
     else:
         alignRSSUFile = __alignRSSUFile
 
-    print(f'{tabulation}{magenta(f"MAFFT alignment starting" + " | " + tRNACount + magenta(" tRNAs-SeC")):^140}\n')
+    tRNACount = int(os.popen(f'grep ">" {processedFile} -c').read().strip())
+
+    print(f'{tabulation}{magenta(f"MAFFT alignment starting" + " | " + numberP(tRNACount) + magenta(" tRNAs-SeC")):^140}\n')
     try:
         args = '--auto --reorder'
         if not progress:
