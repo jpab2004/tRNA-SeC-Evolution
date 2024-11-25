@@ -6,6 +6,7 @@ from textwrap import wrap
 import os, sys, glob, ast
 from json import dumps
 import random, pickle
+import math
 
 
 
@@ -88,7 +89,7 @@ globalTaxonShapes['superkingdom']['Eukaryota'] = 'diamond'
 # Microreact infos to add
 globalMetadataInfos = {
     'colored': ['superkingdom', 'kingdom', 'phylum'],
-    'shaped': ['superkingdom']
+    'shaped': []
 }
 
 
@@ -145,6 +146,17 @@ globalRSSUFileHeader = [
     'primaryAccession', 'insdcAccession', 'location', 'cutoffHead', 'cutoffTail', 'type', 'evidence', 'evidenceDescription',
     'sequenceQuality', 'alignmentQuality', 'subset', 'ncbiTaxId', 'reference', 'classification', 'silvaUri', 'sequence'
 ]
+
+globalTaxonTranslation = {
+    'superkingdom': 'Domínio',
+    'kingdom': 'Reino',
+    'phylum': 'Filo',
+    'class': 'Classe',
+    'order': 'Ordem',
+    'family': 'Família',
+    'genus': 'Gênero',
+    'species': 'Espécie'
+}
 
 
 
@@ -224,15 +236,16 @@ def addColors(c1, c2):
     return color
 
 def plotTaxonAnalysis(taxonAnalysis, levels, sequential=False, totalColor='#999999', colorWeight='#222222', unique=False, show=False):
-    def annotateAx(taxon, found, total, percentage, i, c1, c2):
+    def annotateAx(taxon, found, total, percentage, i, c1, c2, hatch):
         # edgeColor, lineWidth = '#ffffff', 3
         edgeColor, lineWidth = '#000000', 1
 
-        ax.bar(taxon, found, color=c2, bottom=0, edgecolor=edgeColor, linewidth=lineWidth)
+        ax.bar(taxon, found, color=c2, bottom=0, edgecolor=edgeColor, linewidth=lineWidth, hatch=hatch)
         ax.bar(taxon, total-found, color=c1, bottom=found, edgecolor=edgeColor, linewidth=lineWidth)
 
         totalY = total + .15*total
         if len(taxons) / fig.get_figwidth() < 1.5:
+            totalY = found + .15*found
             ax.annotate(f'{percentage}%', (i, totalY), ha='center', va='center', rotation=0)
             return False
         else:
@@ -248,15 +261,16 @@ def plotTaxonAnalysis(taxonAnalysis, levels, sequential=False, totalColor='#9999
 
     for level in levels:
         annotated = False
-        fig, ax = plt.subplots(1, 1, figsize=(16, 6), dpi=100)
+        fig, ax = plt.subplots(1, 1, figsize=(12, 6), dpi=150)
 
         taxons = list(taxon for taxon in taxonAnalysis[level] if not taxon in ['found', 'total', 'percentage', 'counted'])
-        taxons = sorted(taxons, key=lambda x: taxonAnalysis[level][x]['total'] + .1*taxonAnalysis[level][x]['found'], reverse=True)
+        taxons = sorted(taxons, key=lambda x: taxonAnalysis[level][x]['total'] + 1e-3*taxonAnalysis[level][x]['found'], reverse=True)
+        hatch = f'/'*math.ceil((len(taxons)+1)/20)
 
         found = taxonAnalysis[level]['found']
         total = taxonAnalysis[level]['total']
         percentage = taxonAnalysis[level]['percentage']
-        annotated = True if annotateAx('Total', found, total, percentage, 0, totalColor, addColors(totalColor, colorWeight)) else annotated
+        annotated = True if annotateAx('Total', found, total, percentage, 0, totalColor, addColors(totalColor, colorWeight), hatch) else annotated
         
 
         for i, taxon in enumerate(taxons, 1):
@@ -268,37 +282,49 @@ def plotTaxonAnalysis(taxonAnalysis, levels, sequential=False, totalColor='#9999
             found = taxonAnalysis[level][taxon]['found']
             total = taxonAnalysis[level][taxon]['total']
             percentage = taxonAnalysis[level][taxon]['percentage']
-            annotated = True if annotateAx(taxon, found, total, percentage, i, color, colorFound) else annotated
+            annotated = True if annotateAx(taxon, found, total, percentage, i, color, colorFound, hatch) else annotated
 
         ax.set_yscale('log')
         ax.set_ylim([.5, 1.5*ax.get_ylim()[1]])
+        ax.set_xlim([-1, len(taxons)+1])
         
         rot = 90 if len(taxons) / fig.get_figwidth() > 1.5 else 0
         ax.tick_params(axis='x', labelrotation=rot)
         
-        ax.set_xlabel(level[0].upper() + level[1:], fontweight='bold')
-        org = 'species' if unique else 'organisms'
-        ax.set_ylabel(f'Number of tRNA-SeC (log)', fontweight='bold')
-        ax.set_title(f'Number of tRNA-SeC per taxon ({org})', fontweight='bold')
+        xLabel = globalTaxonTranslation[level]
+        orgRaw = 'species' if unique else 'organisms'
+        org = 'espécies' if unique else 'organismos'
+        ax.set_xlabel(xLabel, fontweight='bold', fontsize=20)
+        ax.set_ylabel(f'Número de tRNA-SeC (log)', fontweight='bold', fontsize=15)
+        ax.set_title(f'Número de tRNA-SeC por taxon ({org})', fontweight='bold', fontsize=25)
+        ax.grid(ls='--', alpha=.7, axis='y')
 
+        ax.bar(0, 0, color='#ffffff', hatch='///', edgecolor='#000000', label='Contêm tRNA-SeC')
+        ax.legend()
         if annotated:
-            ax.plot([], [], label='*: 0% of total', color='#ffffff')
-            ax.plot([], [], label='*: > 95% of total', color='#ffffff')
-            legTxts = ax.legend().get_texts()
-            legTxts[0].set_color('#ff0000')
+            ax.plot([], [], label='*: 0% do taxon', color='#ffffff')
+            ax.plot([], [], label='*: > 95% do taxon', color='#ffffff')
+
+            handles, labels = ax.get_legend_handles_labels()
+            order = [2,0,1]
+            legTxts = ax.legend([handles[idx] for idx in order],[labels[idx] for idx in order]).get_texts()
+            legTxts[1].set_color('#ff0000')
+
 
         fig.tight_layout()
         if ((show) and (sequential)):
             plt.show()
 
         pathCheckCreation(f'{globalGenomesPath}/figs')
-        fig.savefig(f'{globalGenomesPath}/figs/{level}_{org}.png', format='png')
+        fig.savefig(f'{globalGenomesPath}/figs/{level}_{orgRaw}.png', format='png')
 
         figs.append(fig)
         axes.append(ax)
     
     if ((show) and (not sequential)):
         plt.show()
+
+    os.system(f'cd {globalGenomesPath}')
     
     return
 
