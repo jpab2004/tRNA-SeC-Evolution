@@ -166,6 +166,11 @@ Genomes/
 Genomes*/
 Teste*/
 Aln*/
+treefile/
 16-18S\ DB/
 lele.py
-*.sh
+
+archaea.sh
+cellular.sh
+eubacteria.sh
+eukaryota.sh

@@ -6,6 +6,7 @@ from textwrap import wrap
 import os, sys, glob, ast
 from json import dumps
 import random, pickle
+import pandas as pd
 import math
 
 
@@ -237,23 +238,25 @@ def addColors(c1, c2):
 
 def plotTaxonAnalysis(taxonAnalysis, levels, sequential=False, totalColor='#999999', colorWeight='#222222', unique=False, show=False):
     def annotateAx(taxon, found, total, percentage, i, c1, c2, hatch):
-        # edgeColor, lineWidth = '#ffffff', 3
         edgeColor, lineWidth = '#000000', 1
 
-        ax.bar(taxon, found, color=c2, bottom=0, edgecolor=edgeColor, linewidth=lineWidth, hatch=hatch)
-        ax.bar(taxon, total-found, color=c1, bottom=found, edgecolor=edgeColor, linewidth=lineWidth)
-
-        totalY = total + .15*total
         if len(taxons) / fig.get_figwidth() < 1.5:
-            totalY = found + .15*found
+            ax.bar(taxon, found, color=c2, bottom=0, edgecolor=edgeColor, linewidth=lineWidth, hatch=hatch)
+            ax.bar(taxon, total-found, color=c1, bottom=found, edgecolor=edgeColor, linewidth=lineWidth)
+            
+            totalY = 1.2*found
             ax.annotate(f'{percentage}%', (i, totalY), ha='center', va='center', rotation=0)
             return False
         else:
+            ax.barh(taxon, found, color=c2, left=0, edgecolor=edgeColor, linewidth=lineWidth, hatch=hatch)
+            ax.barh(taxon, total-found, color=c1, left=found, edgecolor=edgeColor, linewidth=lineWidth)
+
+            totalY = total + .1*total
             if percentage > 95:
-                ax.annotate('*', (i, totalY), ha='center', va='center', rotation=0)
+                ax.annotate('*', (totalY, i), ha='center', va='center', rotation=0)
                 return True
             if percentage <= 0:
-                ax.annotate('*', (i, totalY), ha='center', va='center', rotation=0, color='#ff0000')
+                ax.annotate('*', (totalY, i), ha='center', va='center', rotation=0, color='#ff0000')
                 return True
 
     global globalTaxonColors
@@ -261,11 +264,15 @@ def plotTaxonAnalysis(taxonAnalysis, levels, sequential=False, totalColor='#9999
 
     for level in levels:
         annotated = False
-        fig, ax = plt.subplots(1, 1, figsize=(12, 6), dpi=150)
 
         taxons = list(taxon for taxon in taxonAnalysis[level] if not taxon in ['found', 'total', 'percentage', 'counted'])
         taxons = sorted(taxons, key=lambda x: taxonAnalysis[level][x]['total'] + 1e-3*taxonAnalysis[level][x]['found'], reverse=True)
         hatch = f'/'*math.ceil((len(taxons)+1)/20)
+        
+        if len(taxons) / 12 < 1.5:
+            fig, ax = plt.subplots(1, 1, figsize=(12, 6), dpi=150)
+        else:
+            fig, ax = plt.subplots(1, 1, figsize=(12, 20), dpi=150)
 
         found = taxonAnalysis[level]['found']
         total = taxonAnalysis[level]['total']
@@ -284,22 +291,39 @@ def plotTaxonAnalysis(taxonAnalysis, levels, sequential=False, totalColor='#9999
             percentage = taxonAnalysis[level][taxon]['percentage']
             annotated = True if annotateAx(taxon, found, total, percentage, i, color, colorFound, hatch) else annotated
 
-        ax.set_yscale('log')
-        ax.set_ylim([.5, 1.5*ax.get_ylim()[1]])
-        ax.set_xlim([-1, len(taxons)+1])
-        
-        rot = 90 if len(taxons) / fig.get_figwidth() > 1.5 else 0
-        ax.tick_params(axis='x', labelrotation=rot)
-        
         xLabel = globalTaxonTranslation[level]
         orgRaw = 'species' if unique else 'organisms'
         org = 'espécies' if unique else 'organismos'
-        ax.set_xlabel(xLabel, fontweight='bold', fontsize=20)
-        ax.set_ylabel(f'Número de tRNA-SeC (log)', fontweight='bold', fontsize=15)
-        ax.set_title(f'Número de tRNA-SeC por taxon ({org})', fontweight='bold', fontsize=25)
-        ax.grid(ls='--', alpha=.7, axis='y')
 
-        ax.bar(0, 0, color='#ffffff', hatch='///', edgecolor='#000000', label='Contêm tRNA-SeC')
+        if len(taxons) / fig.get_figwidth() < 1.5:
+            ax.set_title(f'Número de tRNA-SeC por taxon ({org})', fontweight='bold', fontsize=25)
+            ax.set_yscale('log')
+        
+            ax.set_xlabel(xLabel, fontweight='bold', fontsize=20)
+            ax.set_ylabel(f'Número de tRNA-SeC (log)', fontweight='bold', fontsize=15)
+            ax.grid(ls='--', alpha=.7, axis='y')
+            ax.bar(0, 0, color='#ffffff', hatch='///', edgecolor='#000000', label='Contêm tRNA-SeC')
+
+            ax.set_xticks(ax.get_xticks(), labels=ax.get_xticklabels(), fontsize=20, fontweight='bold')
+            ax.set_yticks(ax.get_yticks(), labels=ax.get_yticklabels(), fontsize=15, fontweight='bold')
+
+            ax.set_ylim([.5, .1*ax.get_ylim()[1]])
+            ax.set_xlim([-1, len(taxons)+1])
+        else:
+            ax.set_title(f'Número de tRNA-SeC por taxon ({org})', fontweight='bold', fontsize=25, x=.25)
+            ax.set_xscale('log')
+
+            ax.set_ylabel(xLabel, fontweight='bold', fontsize=30)
+            ax.set_xlabel(f'Número de tRNA-SeC (log)', fontweight='bold', fontsize=25)
+            ax.grid(ls='--', alpha=.7, axis='x')
+            ax.barh(0, 0, color='#ffffff', hatch='///', edgecolor='#000000', label='Contêm tRNA-SeC')
+
+            ax.set_xticks(ax.get_xticks(), labels=ax.get_xticklabels(), fontsize=20, fontweight='bold')
+            ax.set_yticks(ax.get_yticks(), labels=ax.get_yticklabels(), fontsize=15, fontweight='bold')
+
+            ax.set_xlim([.5, .1*ax.get_xlim()[1]])
+            ax.set_ylim([-1, len(taxons)+1])
+
         ax.legend()
         if annotated:
             ax.plot([], [], label='*: 0% do taxon', color='#ffffff')
@@ -307,9 +331,8 @@ def plotTaxonAnalysis(taxonAnalysis, levels, sequential=False, totalColor='#9999
 
             handles, labels = ax.get_legend_handles_labels()
             order = [2,0,1]
-            legTxts = ax.legend([handles[idx] for idx in order],[labels[idx] for idx in order]).get_texts()
+            legTxts = ax.legend([handles[idx] for idx in order],[labels[idx] for idx in order], fontsize=20).get_texts()
             legTxts[1].set_color('#ff0000')
-
 
         fig.tight_layout()
         if ((show) and (sequential)):
@@ -2146,8 +2169,14 @@ def taxonAnalysisFunc(__level='all', __taxonomyFile=None, __detectedFile=None, v
         taxonAnalysisUnique[level]['percentage'] = percentage
 
     if (((debug) or (__level != 'all')) and (verbose)):
+        pprint(red('ORGANISMS!'))
         pretty(taxonAnalysis)
+
+        print()
+        
+        pprint(red('UNIQUE (SPECIES)!'))
         pretty(taxonAnalysisUnique)
+
         if verbose:
             print()
 
